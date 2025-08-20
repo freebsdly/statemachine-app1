@@ -9,12 +9,11 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @AllArgsConstructor(onConstructor_ = @Autowired)
-public class UploadConsumer {
+public class AiSliceConsumer {
 
     private final FileProcessingService fileProcessingService;
 
-
-    @RabbitListener(id = "upload.consumer", queues = "${upload.consumer.queue.name}")
+    @RabbitListener(id = "ai-slice.consumer", queues = "${ai-slice.consumer.queue.name}")
     public void consumeMessage(FileInfo message) {
         try {
             // 处理消息的业务逻辑
@@ -31,9 +30,9 @@ public class UploadConsumer {
      * @param message 消息内容
      */
     private void processMessage(FileInfo message) {
-        log.info("处理消息: {}", message);
+        log.info("处理AI切片消息: {}", message);
         try {
-            fileProcessingService.processFile(FileProcessingState.INITIAL, FileProcessingEvent.UPLOAD_START, message);
+            fileProcessingService.processFile(FileProcessingState.MARKDOWN_CONVERTED, FileProcessingEvent.AI_SLICE_START, message);
         } catch (Exception e) {
             e.printStackTrace();
         }

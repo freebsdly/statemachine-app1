@@ -1,6 +1,8 @@
 package com.trina.visiontask.biz;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateContext;
@@ -12,7 +14,10 @@ import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
+@AllArgsConstructor(onConstructor_ = @Autowired)
 public class PdfConvertAction implements Action<FileProcessingState, FileProcessingEvent> {
+
+    private final MessageProducer messageProducer;
 
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
@@ -49,6 +54,8 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         try {
             Thread.sleep(2000); // 模拟上传耗时
             log.info("转换PDF文件完成: {}", fileInfo.getFileName());
+            // TODO: 更新文件状态
+            messageProducer.sendToMdConvertQueue(fileInfo);
             return true;
         } catch (InterruptedException e) {
             return false;

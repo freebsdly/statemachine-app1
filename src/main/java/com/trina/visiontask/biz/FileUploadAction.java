@@ -1,6 +1,8 @@
 package com.trina.visiontask.biz;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateContext;
@@ -12,7 +14,10 @@ import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
+@AllArgsConstructor(onConstructor_ = @Autowired)
 public class FileUploadAction implements Action<FileProcessingState, FileProcessingEvent> {
+
+    private final MessageProducer messageProducer;
 
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
@@ -59,8 +64,10 @@ public class FileUploadAction implements Action<FileProcessingState, FileProcess
         log.info("正在上传文件: {}", fileInfo.getFileName());
         // 模拟上传过程
         try {
-            Thread.sleep(2000); // 模拟上传耗时
+            Thread.sleep(1000); // 模拟上传耗时
             log.info("文件上传完成: {}", fileInfo.getFileName());
+            // TODO: 更新文件状态
+            messageProducer.sendToPdfConvertQueue(fileInfo);
             return true;
         } catch (InterruptedException e) {
             log.error("文件上传被中断", e);

@@ -10,7 +10,7 @@ public enum FileProcessingEvent {
     MD_CONVERT_START,      // 开始Markdown转换
     MD_CONVERT_SUCCESS,    // Markdown转换成功
     MD_CONVERT_FAILURE,    // Markdown转换失败
-    AI_PROCESS_START,      // 开始AI处理
-    AI_PROCESS_SUCCESS,    // AI处理成功
-    AI_PROCESS_FAILURE     // AI处理失败
+    AI_SLICE_START,      // 开始AI处理
+    AI_SLICE_SUCCESS,    // AI处理成功
+    AI_SLICE_FAILURE     // AI处理失败
 }

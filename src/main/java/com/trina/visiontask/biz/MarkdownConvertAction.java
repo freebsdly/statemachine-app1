@@ -1,6 +1,8 @@
 package com.trina.visiontask.biz;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateContext;
@@ -12,7 +14,10 @@ import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
+@AllArgsConstructor(onConstructor_ = @Autowired)
 public class MarkdownConvertAction implements Action<FileProcessingState, FileProcessingEvent> {
+
+    private final MessageProducer messageProducer;
 
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
@@ -49,8 +54,10 @@ public class MarkdownConvertAction implements Action<FileProcessingState, FilePr
     private boolean convertToMarkdown(FileInfo fileInfo) {
         log.info("正在转换Markdown: {}", fileInfo.getFileName());
         try {
-            Thread.sleep(2000); // 模拟上传耗时
+            Thread.sleep(5000); // 模拟上传耗时
             log.info("转换Markdown完成: {}", fileInfo.getFileName());
+            // TODO: 更新文件状态
+            messageProducer.sendToAiSliceQueue(fileInfo);
             return true;
         } catch (InterruptedException e) {
             return false;

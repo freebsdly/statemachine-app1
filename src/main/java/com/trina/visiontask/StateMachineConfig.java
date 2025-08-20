@@ -29,7 +29,7 @@ public class StateMachineConfig
 
     private final MarkdownConvertAction markdownConvertAction;
 
-    private final AiProcessingAction aiProcessingAction;
+    private final AiSliceAction aiSliceAction;
 
     private final FailureAction failureAction;
 
@@ -37,12 +37,12 @@ public class StateMachineConfig
             FileUploadAction fileUploadAction,
             PdfConvertAction pdfConvertAction,
             MarkdownConvertAction markdownConvertAction,
-            AiProcessingAction aiProcessingAction,
+            AiSliceAction aiSliceAction,
             FailureAction failureAction) {
         this.fileUploadAction = fileUploadAction;
         this.pdfConvertAction = pdfConvertAction;
         this.markdownConvertAction = markdownConvertAction;
-        this.aiProcessingAction = aiProcessingAction;
+        this.aiSliceAction = aiSliceAction;
         this.failureAction = failureAction;
     }
 
@@ -121,18 +121,18 @@ public class StateMachineConfig
         // Markdown转换完成 -> AI处理中
         transitions.withExternal()
                 .source(FileProcessingState.MARKDOWN_CONVERTED).target(FileProcessingState.AI_PROCESSING)
-                .event(FileProcessingEvent.AI_PROCESS_START)
-                .action(aiProcessingAction);
+                .event(FileProcessingEvent.AI_SLICE_START)
+                .action(aiSliceAction);
 
         // AI处理中 -> 全部完成
         transitions.withExternal()
                 .source(FileProcessingState.AI_PROCESSING).target(FileProcessingState.COMPLETED)
-                .event(FileProcessingEvent.AI_PROCESS_SUCCESS);
+                .event(FileProcessingEvent.AI_SLICE_SUCCESS);
 
         // AI处理中 -> 失败
         transitions.withExternal()
                 .source(FileProcessingState.AI_PROCESSING).target(FileProcessingState.FAILED)
-                .event(FileProcessingEvent.AI_PROCESS_FAILURE)
+                .event(FileProcessingEvent.AI_SLICE_FAILURE)
                 .action(failureAction);
     }
 

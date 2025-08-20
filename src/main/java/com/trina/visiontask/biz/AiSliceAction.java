@@ -12,7 +12,7 @@ import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
-public class AiProcessingAction implements Action<FileProcessingState, FileProcessingEvent> {
+public class AiSliceAction implements Action<FileProcessingState, FileProcessingEvent> {
 
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
@@ -28,18 +28,18 @@ public class AiProcessingAction implements Action<FileProcessingState, FileProce
 
                 if (uploadSuccess) {
                     // 文件上传成功，触发UPLOAD_SUCCESS事件
-                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.AI_PROCESS_SUCCESS)
+                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_SUCCESS)
                             .setHeader("fileInfo", fileInfo)
                             .build();
                     context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
                 } else {
-                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.AI_PROCESS_FAILURE)
+                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
                             .setHeader("error", "执行AI切片失败")
                             .build();
                     context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
                 }
             } catch (Exception e) {
-                Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.AI_PROCESS_FAILURE)
+                Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
                         .setHeader("error", "执行AI切片失败")
                         .build();
                 context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
@@ -50,7 +50,7 @@ public class AiProcessingAction implements Action<FileProcessingState, FileProce
     private boolean processWithAi(FileInfo fileInfo) {
         log.info("正在执行AI切片: {}", fileInfo.getFileName());
         try {
-            Thread.sleep(2000); // 模拟上传耗时
+            Thread.sleep(4000); // 模拟上传耗时
             log.info("执行AI切片完成: {}", fileInfo.getFileName());
             return true;
         } catch (InterruptedException e) {

@@ -1,5 +1,6 @@
 package com.trina.visiontask.biz;
 
+import com.trina.visiontask.Config;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -9,12 +10,11 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @AllArgsConstructor(onConstructor_ = @Autowired)
-public class UploadConsumer {
+public class MarkdownConvertConsumer {
 
     private final FileProcessingService fileProcessingService;
 
-
-    @RabbitListener(id = "upload.consumer", queues = "${upload.consumer.queue.name}")
+    @RabbitListener(id = "md-convert.consumer",  queues = "${md-convert.consumer.queue.name}")
     public void consumeMessage(FileInfo message) {
         try {
             // 处理消息的业务逻辑
@@ -31,9 +31,9 @@ public class UploadConsumer {
      * @param message 消息内容
      */
     private void processMessage(FileInfo message) {
-        log.info("处理消息: {}", message);
+        log.info("处理Markdown转换消息: {}", message);
         try {
-            fileProcessingService.processFile(FileProcessingState.INITIAL, FileProcessingEvent.UPLOAD_START, message);
+            fileProcessingService.processFile(FileProcessingState.PDF_CONVERTED, FileProcessingEvent.MD_CONVERT_START, message);
         } catch (Exception e) {
             e.printStackTrace();
         }
