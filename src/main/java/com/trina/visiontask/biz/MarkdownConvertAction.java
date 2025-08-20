@@ -15,52 +15,56 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @Component
 @AllArgsConstructor(onConstructor_ = @Autowired)
-public class MarkdownConvertAction implements Action<FileProcessingState, FileProcessingEvent> {
+public class MarkdownConvertAction implements Action<FileProcessingState, FileProcessingEvent>
+{
 
     private final MessageProducer messageProducer;
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
+    {
         CompletableFuture.runAsync(() -> {
-            log.info("开始转换markdown...");
-
+            log.info("start converting markdown");
+            Message<FileProcessingEvent> message;
             try {
                 // 获取文件信息
                 FileInfo fileInfo = (FileInfo) context.getMessage().getHeaders().get("fileInfo");
 
                 boolean convertSuccess = convertToMarkdown(fileInfo);
-
                 if (convertSuccess) {
                     // 文件上传成功，触发UPLOAD_SUCCESS事件
-                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.MD_CONVERT_SUCCESS)
+                    message = MessageBuilder
+                            .withPayload(FileProcessingEvent.MD_CONVERT_SUCCESS)
                             .setHeader("fileInfo", fileInfo)
                             .build();
-                    context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
                 } else {
-                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.MD_CONVERT_FAILURE)
-                            .setHeader("error", "转换markdown失败")
+                    message = MessageBuilder
+                            .withPayload(FileProcessingEvent.MD_CONVERT_FAILURE)
+                            .setHeader("error", "convert markdown failed")
                             .build();
-                    context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
                 }
+                context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
             } catch (Exception e) {
-                Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.MD_CONVERT_FAILURE)
-                        .setHeader("error", "转换markdown失败")
+                message = MessageBuilder
+                        .withPayload(FileProcessingEvent.MD_CONVERT_FAILURE)
+                        .setHeader("error", "convert markdown failed")
                         .build();
                 context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
             }
         });
     }
 
-    private boolean convertToMarkdown(FileInfo fileInfo) {
-        log.info("正在转换Markdown: {}", fileInfo.getFileName());
-        try {
-            Thread.sleep(5000); // 模拟上传耗时
-            log.info("转换Markdown完成: {}", fileInfo.getFileName());
-            // TODO: 更新文件状态
-            messageProducer.sendToAiSliceQueue(fileInfo);
-            return true;
-        } catch (InterruptedException e) {
+    private boolean convertToMarkdown(FileInfo fileInfo) throws Exception
+    {
+        if (fileInfo == null) {
+            log.error("file info is null");
             return false;
         }
+        log.info("converting markdown {}", fileInfo.getFileName());
+        Thread.sleep(5000); // 模拟上传耗时
+        log.info("convert markdown {} finished", fileInfo.getFileName());
+        // TODO: 更新文件状态
+        messageProducer.sendToAiSliceQueue(fileInfo);
+        return true;
     }
 }

@@ -1,7 +1,9 @@
 package com.trina.visiontask;
 
 import com.trina.visiontask.biz.*;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
@@ -18,11 +20,10 @@ import java.util.EnumSet;
 @Slf4j
 @Configuration
 @EnableStateMachineFactory
+@AllArgsConstructor(onConstructor_ = @Autowired)
 public class StateMachineConfig
-        extends EnumStateMachineConfigurerAdapter<FileProcessingState, FileProcessingEvent> {
-
-
-    // 注入各个步骤的处理器
+        extends EnumStateMachineConfigurerAdapter<FileProcessingState, FileProcessingEvent>
+{
     private final FileUploadAction fileUploadAction;
 
     private final PdfConvertAction pdfConvertAction;
@@ -33,21 +34,12 @@ public class StateMachineConfig
 
     private final FailureAction failureAction;
 
-    public StateMachineConfig(
-            FileUploadAction fileUploadAction,
-            PdfConvertAction pdfConvertAction,
-            MarkdownConvertAction markdownConvertAction,
-            AiSliceAction aiSliceAction,
-            FailureAction failureAction) {
-        this.fileUploadAction = fileUploadAction;
-        this.pdfConvertAction = pdfConvertAction;
-        this.markdownConvertAction = markdownConvertAction;
-        this.aiSliceAction = aiSliceAction;
-        this.failureAction = failureAction;
-    }
+    private final MessageProducer messageProducer;
 
     @Override
-    public void configure(StateMachineConfigurationConfigurer<FileProcessingState, FileProcessingEvent> config) throws Exception {
+    public void configure(StateMachineConfigurationConfigurer<FileProcessingState, FileProcessingEvent> config)
+            throws Exception
+    {
         config
                 .withConfiguration()
                 .autoStartup(false)
@@ -55,7 +47,8 @@ public class StateMachineConfig
     }
 
     @Override
-    public void configure(StateMachineStateConfigurer<FileProcessingState, FileProcessingEvent> states) throws Exception {
+    public void configure(StateMachineStateConfigurer<FileProcessingState, FileProcessingEvent> states) throws Exception
+    {
         states
                 .withStates()
                 .initial(FileProcessingState.INITIAL)
@@ -66,7 +59,8 @@ public class StateMachineConfig
 
     @Override
     public void configure(StateMachineTransitionConfigurer<FileProcessingState, FileProcessingEvent> transitions)
-            throws Exception {
+            throws Exception
+    {
         // 初始状态 -> 上传中
         transitions.withExternal()
                 .source(FileProcessingState.INITIAL).target(FileProcessingState.UPLOADING)
@@ -137,10 +131,14 @@ public class StateMachineConfig
     }
 
     @Bean
-    public StateMachineListener<FileProcessingState, FileProcessingEvent> listener() {
-        return new StateMachineListenerAdapter<>() {
+    public StateMachineListener<FileProcessingState, FileProcessingEvent> listener()
+    {
+        return new StateMachineListenerAdapter<>()
+        {
             @Override
-            public void stateChanged(State<FileProcessingState, FileProcessingEvent> from, State<FileProcessingState, FileProcessingEvent> to) {
+            public void stateChanged(State<FileProcessingState, FileProcessingEvent> from,
+                                     State<FileProcessingState, FileProcessingEvent> to)
+            {
                 FileProcessingState from_state = null;
                 FileProcessingState to_state = null;
                 if (from != null) {

@@ -12,13 +12,14 @@ import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
-public class AiSliceAction implements Action<FileProcessingState, FileProcessingEvent> {
+public class AiSliceAction implements Action<FileProcessingState, FileProcessingEvent>
+{
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
+    {
         CompletableFuture.runAsync(() -> {
-            log.info("开始执行AI切片...");
-
+            Message<FileProcessingEvent> message;
             try {
                 // 获取文件信息
                 FileInfo fileInfo = (FileInfo) context.getMessage().getHeaders().get("fileInfo");
@@ -28,34 +29,36 @@ public class AiSliceAction implements Action<FileProcessingState, FileProcessing
 
                 if (uploadSuccess) {
                     // 文件上传成功，触发UPLOAD_SUCCESS事件
-                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_SUCCESS)
+                    message = MessageBuilder
+                            .withPayload(FileProcessingEvent.AI_SLICE_SUCCESS)
                             .setHeader("fileInfo", fileInfo)
                             .build();
-                    context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
                 } else {
-                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
-                            .setHeader("error", "执行AI切片失败")
+                    message = MessageBuilder
+                            .withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
+                            .setHeader("error", "process ai slice failed")
                             .build();
-                    context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
                 }
+                context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
             } catch (Exception e) {
-                Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
-                        .setHeader("error", "执行AI切片失败")
+                message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
+                        .setHeader("error", "process ai slice failed")
                         .build();
                 context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
             }
         });
     }
 
-    private boolean processWithAi(FileInfo fileInfo) {
-        log.info("正在执行AI切片: {}", fileInfo.getFileName());
-        try {
-            Thread.sleep(4000); // 模拟上传耗时
-            log.info("执行AI切片完成: {}", fileInfo.getFileName());
-            return true;
-        } catch (InterruptedException e) {
+    private boolean processWithAi(FileInfo fileInfo) throws Exception
+    {
+        if (fileInfo == null) {
+            log.error("file info is null");
             return false;
         }
+        log.info("processing ai slice: {}", fileInfo.getFileName());
+        Thread.sleep(4000); // 模拟上传耗时
+        log.info("ai slice {} finished", fileInfo.getFileName());
+        return true;
     }
 }
 

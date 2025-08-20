@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineBuilder;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
@@ -18,7 +17,8 @@ import java.util.EnumSet;
 @Slf4j
 @Service
 @RequiredArgsConstructor(onConstructor_ = {@Autowired})
-public class FileProcessingService {
+public class FileProcessingService
+{
 
     // 注入各个步骤的处理器
     private final FileUploadAction fileUploadAction;
@@ -32,18 +32,21 @@ public class FileProcessingService {
     private final FailureAction failureAction;
 
 
-    @Async
-    public void processFile(FileProcessingState initState, FileProcessingEvent event, FileInfo fileInfo) throws Exception {
+    public void processFile(FileProcessingState initState, FileProcessingEvent event, FileInfo fileInfo)
+            throws Exception
+    {
         // 这里使用builder创建状态机，以便从指定的初始状态开始，例如文件已经上传，从UPLOADED状态开始，发送事件PDF_CONVERT_START事件，开始PDF转换
         StateMachine<FileProcessingState, FileProcessingEvent> stateMachine = buildStateMachine(initState);
         Message<FileProcessingEvent> message = MessageBuilder.withPayload(event)
                 .setHeader("fileInfo", fileInfo)
                 .build();
         // 发送初始事件，开始文件处理流程
-        stateMachine.sendEvent(Mono.just(message)).subscribe();
+        stateMachine.sendEvent(Mono.just(message)).blockLast();
     }
 
-    private StateMachine<FileProcessingState, FileProcessingEvent> buildStateMachine(FileProcessingState initState) throws Exception {
+    private StateMachine<FileProcessingState, FileProcessingEvent> buildStateMachine(FileProcessingState initState)
+            throws Exception
+    {
         StateMachineBuilder.Builder<FileProcessingState, FileProcessingEvent> builder = StateMachineBuilder.builder();
         builder.configureStates()
                 .withStates()
@@ -122,9 +125,12 @@ public class FileProcessingService {
         builder.configureConfiguration()
                 .withConfiguration()
                 .autoStartup(true)
-                .listener(new StateMachineListenerAdapter<>() {
+                .listener(new StateMachineListenerAdapter<>()
+                {
                     @Override
-                    public void stateChanged(State<FileProcessingState, FileProcessingEvent> from, State<FileProcessingState, FileProcessingEvent> to) {
+                    public void stateChanged(State<FileProcessingState, FileProcessingEvent> from,
+                                             State<FileProcessingState, FileProcessingEvent> to)
+                    {
                         FileProcessingState from_state = null;
                         FileProcessingState to_state = null;
                         if (from != null) {

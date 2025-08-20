@@ -15,14 +15,17 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @Component
 @AllArgsConstructor(onConstructor_ = @Autowired)
-public class PdfConvertAction implements Action<FileProcessingState, FileProcessingEvent> {
+public class PdfConvertAction implements Action<FileProcessingState, FileProcessingEvent>
+{
 
     private final MessageProducer messageProducer;
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
+    {
         CompletableFuture.runAsync(() -> {
-            log.info("开始执行PDF转换...");
+            log.info("start converting pdf");
+            Message<FileProcessingEvent> message;
             try {
                 // 获取文件信息
                 FileInfo fileInfo = (FileInfo) context.getMessage().getHeaders().get("fileInfo");
@@ -30,36 +33,39 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
                 boolean convertSuccess = convertToPdf(fileInfo);
 
                 if (convertSuccess) {
-                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.PDF_CONVERT_SUCCESS)
+                    message = MessageBuilder
+                            .withPayload(FileProcessingEvent.PDF_CONVERT_SUCCESS)
                             .setHeader("fileInfo", fileInfo)
                             .build();
-                    context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
                 } else {
-                    Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.PDF_CONVERT_FAILURE)
-                            .setHeader("error", "pdf转换失败")
+                    message = MessageBuilder
+                            .withPayload(FileProcessingEvent.PDF_CONVERT_FAILURE)
+                            .setHeader("error", "convert pdf failed")
                             .build();
-                    context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
                 }
+                context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
             } catch (Exception e) {
-                Message<FileProcessingEvent> message = MessageBuilder.withPayload(FileProcessingEvent.PDF_CONVERT_FAILURE)
-                        .setHeader("error", "pdf转换失败")
+                message = MessageBuilder
+                        .withPayload(FileProcessingEvent.PDF_CONVERT_FAILURE)
+                        .setHeader("error", "convert pdf failed")
                         .build();
                 context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
             }
         });
     }
 
-    private boolean convertToPdf(FileInfo fileInfo) {
-        log.info("正在转换PDF文件: {}", fileInfo.getFileName());
-        try {
-            Thread.sleep(2000); // 模拟上传耗时
-            log.info("转换PDF文件完成: {}", fileInfo.getFileName());
-            // TODO: 更新文件状态
-            messageProducer.sendToMdConvertQueue(fileInfo);
-            return true;
-        } catch (InterruptedException e) {
+    private boolean convertToPdf(FileInfo fileInfo) throws Exception
+    {
+        if (fileInfo == null) {
+            log.error("file info is null");
             return false;
         }
+        log.info("converting pdf: {}", fileInfo.getFileName());
+        Thread.sleep(2000); // 模拟上传耗时
+        log.info("convert pdf {} finished", fileInfo.getFileName());
+        // TODO: 更新文件状态
+        messageProducer.sendToMdConvertQueue(fileInfo);
+        return true;
     }
 }
 
