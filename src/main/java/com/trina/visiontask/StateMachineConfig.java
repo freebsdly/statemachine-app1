@@ -13,6 +13,7 @@ import org.springframework.statemachine.config.builders.StateMachineStateConfigu
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
 import org.springframework.statemachine.listener.StateMachineListener;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
+import org.springframework.statemachine.processor.StateMachineAnnotationPostProcessor;
 import org.springframework.statemachine.state.State;
 
 import java.util.EnumSet;
@@ -135,6 +136,7 @@ public class StateMachineConfig
     {
         return new StateMachineListenerAdapter<>()
         {
+
             @Override
             public void stateChanged(State<FileProcessingState, FileProcessingEvent> from,
                                      State<FileProcessingState, FileProcessingEvent> to)
@@ -151,5 +153,10 @@ public class StateMachineConfig
                 log.info("State change from {} to {}", from_state, to_state);
             }
         };
+    }
+
+    @Bean
+    public static StateMachineAnnotationPostProcessor stateMachineAnnotationPostProcessor() {
+        return new StateMachineAnnotationPostProcessor();
     }
 }

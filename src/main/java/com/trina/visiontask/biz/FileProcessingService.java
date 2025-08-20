@@ -12,6 +12,7 @@ import org.springframework.statemachine.state.State;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.EnumSet;
 
 @Slf4j
@@ -41,7 +42,8 @@ public class FileProcessingService
                 .setHeader("fileInfo", fileInfo)
                 .build();
         // 发送初始事件，开始文件处理流程
-        stateMachine.sendEvent(Mono.just(message)).blockLast();
+        stateMachine.sendEvent(Mono.just(message)).blockLast(Duration.ofSeconds(10L));
+        log.info("file processing completed");
     }
 
     private StateMachine<FileProcessingState, FileProcessingEvent> buildStateMachine(FileProcessingState initState)
@@ -127,6 +129,11 @@ public class FileProcessingService
                 .autoStartup(true)
                 .listener(new StateMachineListenerAdapter<>()
                 {
+                    @Override
+                    public void eventNotAccepted(Message<FileProcessingEvent> event) {
+                        log.debug("Event not accepted: {}", event);
+                    }
+
                     @Override
                     public void stateChanged(State<FileProcessingState, FileProcessingEvent> from,
                                              State<FileProcessingState, FileProcessingEvent> to)

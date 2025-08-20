@@ -15,14 +15,12 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @Component
 @AllArgsConstructor(onConstructor_ = @Autowired)
-public class FileUploadAction implements Action<FileProcessingState, FileProcessingEvent>
-{
+public class FileUploadAction implements Action<FileProcessingState, FileProcessingEvent> {
 
     private final MessageProducer messageProducer;
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
-    {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
             try {
@@ -54,11 +52,9 @@ public class FileUploadAction implements Action<FileProcessingState, FileProcess
                         .blockLast();
             }
         });
-
     }
 
-    private boolean uploadFile(FileInfo fileInfo) throws Exception
-    {
+    private boolean uploadFile(FileInfo fileInfo) throws Exception {
         if (fileInfo == null) {
             log.error("file info is null");
             return false;
