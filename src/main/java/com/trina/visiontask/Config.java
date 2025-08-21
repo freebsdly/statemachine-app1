@@ -1,56 +1,70 @@
 package com.trina.visiontask;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import com.aliyun.oss.OSS;
+import com.aliyun.oss.OSSClientBuilder;
+import com.trina.visiontask.biz.ObjectStorageOptions;
+import com.trina.visiontask.converter.ConverterOptions;
+import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.buffer.DataBufferFactory;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 
-@Component
+import java.util.concurrent.TimeUnit;
+
+@Configuration
 public class Config {
 
-    @Value("${upload.consumer.queue.name}")
-    public String uploadQueueName;
+    @Bean
+    public String taskInfoKey() {
+        return "task.info";
+    }
 
-    @Value("${upload.consumer.queue.x-max-priority}")
-    public Integer uploadQueueXMaxPriority;
+    @Bean
+    public long waitTimeout() {
+        return 30;
+    }
 
-    @Value("${upload.consumer.exchange.name}")
-    public String uploadExchangeName;
+    @Bean
+    @ConfigurationProperties(prefix = "pdf-convert.api")
+    public ConverterOptions converterOptions() {
+        return new ConverterOptions();
+    }
 
-    @Value("${upload.consumer.routing.key}")
-    public String uploadRoutingKey;
+    @Bean
+    @ConfigurationProperties(prefix = "oss")
+    public ObjectStorageOptions objectStorageOptions() {
+        return new ObjectStorageOptions();
+    }
 
-    @Value("${pdf-convert.consumer.queue.name}")
-    public String pdfConvertQueueName;
+    @Bean
+    public WebClient webClient(@Qualifier("converterOptions") ConverterOptions options) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, options.getConnectTimeout())
+                .doOnConnected(conn -> conn
+                        .addHandlerLast(new ReadTimeoutHandler(options.getReadTimeout(), TimeUnit.MILLISECONDS))
+                        .addHandlerLast(new WriteTimeoutHandler(options.getWriteTimeout(), TimeUnit.MILLISECONDS))
+                );
+        return WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .build();
+    }
 
-    @Value("${pdf-convert.consumer.queue.x-max-priority}")
-    public Integer pdfConvertQueueXMaxPriority;
+    @Bean
+    public OSS ossClient(@Qualifier("objectStorageOptions") ObjectStorageOptions options) {
+        return new OSSClientBuilder()
+                .build(options.getEndpoint(), options.getAccessKey(), options.getAccessSecret());
+    }
 
-    @Value("${pdf-convert.consumer.exchange.name}")
-    public String pdfConvertExchangeName;
-
-    @Value("${pdf-convert.consumer.routing.key}")
-    public String pdfConvertRoutingKey;
-
-    @Value("${md-convert.consumer.queue.name}")
-    public String mdConvertQueueName;
-
-    @Value("${md-convert.consumer.queue.x-max-priority}")
-    public Integer mdConvertQueueXMaxPriority;
-
-    @Value("${md-convert.consumer.exchange.name}")
-    public String mdConvertExchangeName;
-
-    @Value("${md-convert.consumer.routing.key}")
-    public String mdConvertRoutingKey;
-
-    @Value("${ai-slice.consumer.queue.name}")
-    public String aiSliceQueueName;
-
-    @Value("${ai-slice.consumer.queue.x-max-priority}")
-    public Integer aiSliceQueueXMaxPriority;
-
-    @Value("${ai-slice.consumer.exchange.name}")
-    public String aiSliceExchangeName;
-
-    @Value("${ai-slice.consumer.routing.key}")
-    public String aiSliceRoutingKey;
+    @Bean
+    public DataBufferFactory dataBufferFactory() {
+        return new DefaultDataBufferFactory();
+    }
 }

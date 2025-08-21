@@ -1,57 +1,59 @@
 package com.trina.visiontask.biz;
 
-import com.trina.visiontask.Config;
-import lombok.AllArgsConstructor;
+import com.trina.visiontask.MQConfiguration;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@AllArgsConstructor(onConstructor_ = @Autowired)
 public class MessageProducer {
 
     private final RabbitTemplate rabbitTemplate;
+    private final MQConfiguration uploadConfig;
+    private final MQConfiguration pdfConvertConfig;
+    private final MQConfiguration mdConvertConfig;
+    private final MQConfiguration aiSliceConfig;
 
-    private final Config config;
+    public MessageProducer(RabbitTemplate rabbitTemplate,
+                           @Qualifier("uploadConfiguration") MQConfiguration uploadConfig,
+                           @Qualifier("pdfConvertConfiguration") MQConfiguration pdfConvertConfig,
+                           @Qualifier("mdConvertConfiguration") MQConfiguration mdConvertConfig,
+                           @Qualifier("aiSliceConfiguration") MQConfiguration aiSliceConfig) {
+        this.rabbitTemplate = rabbitTemplate;
+        this.uploadConfig = uploadConfig;
+        this.pdfConvertConfig = pdfConvertConfig;
+        this.mdConvertConfig = mdConvertConfig;
+        this.aiSliceConfig = aiSliceConfig;
+    }
 
-    public void sendToUploadQueue(FileInfo fileInfo) throws AmqpException {
-        rabbitTemplate.convertAndSend(config.uploadExchangeName, config.uploadRoutingKey, fileInfo, message -> {
+
+    public void sendToUploadQueue(TaskInfo info) throws AmqpException {
+        sendMessage(uploadConfig, info);
+    }
+
+    public void sendToPdfConvertQueue(TaskInfo info) throws AmqpException {
+        sendMessage(pdfConvertConfig, info);
+    }
+
+    public void sendToMdConvertQueue(TaskInfo info) throws AmqpException {
+        sendMessage(mdConvertConfig, info);
+    }
+
+    public void sendToAiSliceQueue(TaskInfo info) throws AmqpException {
+        sendMessage(aiSliceConfig, info);
+    }
+
+    private void sendMessage(MQConfiguration config, TaskInfo info) throws AmqpException {
+        rabbitTemplate.convertAndSend(config.getExchangeName(), config.getRoutingKey(), info, message -> {
             // 设置优先级属性
-            int priority = calculatePriority(fileInfo);
+            int priority = calculatePriority(info);
             message.getMessageProperties().setPriority(priority);
             return message;
         });
     }
 
-    public void sendToPdfConvertQueue(FileInfo fileInfo) throws AmqpException {
-        rabbitTemplate.convertAndSend(config.pdfConvertExchangeName, config.pdfConvertRoutingKey, fileInfo, message -> {
-            // 设置优先级属性
-            int priority = calculatePriority(fileInfo);
-            message.getMessageProperties().setPriority(priority);
-            return message;
-        });
-    }
-
-    public void sendToMdConvertQueue(FileInfo fileInfo) throws AmqpException {
-        rabbitTemplate.convertAndSend(config.mdConvertExchangeName, config.mdConvertRoutingKey, fileInfo, message -> {
-            // 设置优先级属性
-            int priority = calculatePriority(fileInfo);
-            message.getMessageProperties().setPriority(priority);
-            return message;
-        });
-    }
-
-    public void sendToAiSliceQueue(FileInfo fileInfo) throws AmqpException {
-        rabbitTemplate.convertAndSend(config.aiSliceExchangeName, config.aiSliceRoutingKey, fileInfo, message -> {
-            // 设置优先级属性
-            int priority = calculatePriority(fileInfo);
-            message.getMessageProperties().setPriority(priority);
-            return message;
-        });
-    }
-
-    public int calculatePriority(FileInfo fileInfo) {
+    public int calculatePriority(TaskInfo info) {
         // Calculate priority based on file size
         return 5;
     }

@@ -1,19 +1,27 @@
 package com.trina.visiontask.biz;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
-public class FileInfo implements Serializable
-{
+public class FileInfo implements Serializable {
+    private UUID id;
     private String fileName;
     private String fileType;
+    private String mimeType;
+    private String ossFileKey;
+    private String ossPDFKey;
+    private String ossMDKey;
     private String filePath;
+    private String pdfPath;
+    private String mdPath;
+    private LocalDateTime createTime;
+    private LocalDateTime modifyTime;
     private long fileSize;
 }
 

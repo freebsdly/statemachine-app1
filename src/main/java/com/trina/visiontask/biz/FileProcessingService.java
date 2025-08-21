@@ -1,8 +1,7 @@
 package com.trina.visiontask.biz;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
@@ -12,15 +11,12 @@ import org.springframework.statemachine.state.State;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.EnumSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor(onConstructor_ = {@Autowired})
 public class FileProcessingService {
 
     // 注入各个步骤的处理器
@@ -34,8 +30,28 @@ public class FileProcessingService {
 
     private final FailureAction failureAction;
 
+    private final String taskInfoKey;
 
-    public void processFile(FileProcessingState initState, FileProcessingEvent event, FileInfo fileInfo)
+    private final long waitTimeout;
+
+    public FileProcessingService(FileUploadAction fileUploadAction,
+                                 PdfConvertAction pdfConvertAction,
+                                 MarkdownConvertAction markdownConvertAction,
+                                 AiSliceAction aiSliceAction,
+                                 FailureAction failureAction,
+                                 @Qualifier("taskInfoKey") String taskInfoKey,
+                                 @Qualifier("waitTimeout") long timeout) {
+        this.fileUploadAction = fileUploadAction;
+        this.pdfConvertAction = pdfConvertAction;
+        this.markdownConvertAction = markdownConvertAction;
+        this.aiSliceAction = aiSliceAction;
+        this.failureAction = failureAction;
+        this.taskInfoKey = taskInfoKey;
+        this.waitTimeout = timeout;
+    }
+
+
+    public boolean processFile(FileProcessingState initState, FileProcessingEvent event, TaskInfo taskInfo)
             throws Exception {
         // 这里使用builder创建状态机，以便从指定的初始状态开始，以便从指定的初始状态开始，例如文件已经上传，从UPLOADED状态开始，发送事件PDF_CONVERT_START事件，开始PDF转换
         StateMachine<FileProcessingState, FileProcessingEvent> stateMachine = buildStateMachine(initState);
@@ -69,13 +85,13 @@ public class FileProcessingService {
         };
         stateMachine.addStateListener(listener);
         Message<FileProcessingEvent> message = MessageBuilder.withPayload(event)
-                .setHeader("fileInfo", fileInfo)
+                .setHeader(taskInfoKey, taskInfo)
                 .build();
         // 发送初始事件，开始文件处理流程
         stateMachine.sendEvent(Mono.just(message)).blockLast();
 
         // 等待处理完成
-        completionLatch.await(30, TimeUnit.SECONDS);
+        return completionLatch.await(waitTimeout, TimeUnit.SECONDS);
     }
 
     private StateMachine<FileProcessingState, FileProcessingEvent> buildStateMachine(FileProcessingState initState)

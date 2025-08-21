@@ -1,28 +1,29 @@
 package com.trina.visiontask.biz;
 
 import com.rabbitmq.client.Channel;
-import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@AllArgsConstructor(onConstructor_ = @Autowired)
 @ConditionalOnProperty(name = "ai-slice.consumer.enabled", havingValue = "true", matchIfMissing = false)
 public class AiSliceConsumer {
 
     private final FileProcessingService fileProcessingService;
 
-    @RabbitListener(id = "ai-slice.consumer", queues = "${ai-slice.consumer.queue.name}")
-    public void consumeMessage(Channel channel, FileInfo fileInfo, Message message) throws Exception {
-        log.info("received ai slice message: {}", fileInfo);
+    public AiSliceConsumer(FileProcessingService fileProcessingService) {
+        this.fileProcessingService = fileProcessingService;
+    }
+
+    @RabbitListener(id = "ai-slice.consumer", queues = "${ai-slice.consumer.queue-name}")
+    public void consumeMessage(Channel channel, TaskInfo taskInfo, Message message) throws Exception {
+        log.info("received ai slice message: {}", taskInfo);
         try {
             // 处理消息的业务逻辑
-            processMessage(fileInfo);
+            processMessage(taskInfo);
             channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         } catch (Exception e) {
             log.warn("consume ai slice message failed, {}", e.getMessage());
@@ -36,7 +37,7 @@ public class AiSliceConsumer {
      *
      * @param message 消息内容
      */
-    private void processMessage(FileInfo message) throws Exception {
+    private void processMessage(TaskInfo message) throws Exception {
         fileProcessingService.processFile(
                 FileProcessingState.MARKDOWN_CONVERTED,
                 FileProcessingEvent.AI_SLICE_START,

@@ -1,6 +1,7 @@
 package com.trina.visiontask.biz;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateContext;
@@ -14,24 +15,25 @@ import java.util.concurrent.CompletableFuture;
 @Component
 public class AiSliceAction implements Action<FileProcessingState, FileProcessingEvent> {
 
+    private final String taskInfoKey;
+
+    public AiSliceAction(@Qualifier("taskInfoKey") String taskInfoKey) {
+        this.taskInfoKey = taskInfoKey;
+    }
+
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
+            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
             try {
-                // 获取文件信息
-                FileInfo fileInfo = (FileInfo) context.getMessage().getHeaders().get("fileInfo");
-
-                // 执行文件上传逻辑
-                processWithAi(fileInfo);
-
-                // 文件上传成功，触发UPLOAD_SUCCESS事件
+                taskInfo = processWithAi(taskInfo);
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.AI_SLICE_SUCCESS)
-                        .setHeader("fileInfo", fileInfo)
+                        .setHeader(taskInfoKey, taskInfo)
                         .build();
-
             } catch (Exception e) {
+                taskInfo.setMessage(e.getMessage());
                 message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
                         .setHeader("error", "process ai slice failed")
                         .build();
@@ -40,14 +42,15 @@ public class AiSliceAction implements Action<FileProcessingState, FileProcessing
         });
     }
 
-    private void processWithAi(FileInfo fileInfo) throws Exception {
-        if (fileInfo == null) {
-            log.error("file info is null");
+    private TaskInfo processWithAi(TaskInfo taskInfo) throws Exception {
+        if (taskInfo == null || taskInfo.getFileInfo() == null) {
             throw new Exception("file info is null");
         }
+        FileInfo fileInfo = taskInfo.getFileInfo();
         log.info("processing ai slice: {}", fileInfo.getFileName());
         Thread.sleep(4000); // 模拟上传耗时
         log.info("ai slice {} finished", fileInfo.getFileName());
+        return taskInfo;
     }
 }
 

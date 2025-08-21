@@ -1,15 +1,12 @@
 package com.trina.visiontask.biz;
 
-import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.action.Action;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@AllArgsConstructor(onConstructor_ = @Autowired)
 public class FailureAction implements Action<FileProcessingState, FileProcessingEvent> {
 
     @Override
