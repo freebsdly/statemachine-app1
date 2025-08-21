@@ -14,12 +14,14 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.EnumSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor(onConstructor_ = {@Autowired})
-public class FileProcessingService
-{
+public class FileProcessingService {
 
     // 注入各个步骤的处理器
     private final FileUploadAction fileUploadAction;
@@ -34,21 +36,50 @@ public class FileProcessingService
 
 
     public void processFile(FileProcessingState initState, FileProcessingEvent event, FileInfo fileInfo)
-            throws Exception
-    {
-        // 这里使用builder创建状态机，以便从指定的初始状态开始，例如文件已经上传，从UPLOADED状态开始，发送事件PDF_CONVERT_START事件，开始PDF转换
+            throws Exception {
+        // 这里使用builder创建状态机，以便从指定的初始状态开始，以便从指定的初始状态开始，例如文件已经上传，从UPLOADED状态开始，发送事件PDF_CONVERT_START事件，开始PDF转换
         StateMachine<FileProcessingState, FileProcessingEvent> stateMachine = buildStateMachine(initState);
+        CountDownLatch completionLatch = new CountDownLatch(1);
+
+        StateMachineListenerAdapter<FileProcessingState, FileProcessingEvent> listener = new StateMachineListenerAdapter<>() {
+            @Override
+            public void stateChanged(State<FileProcessingState, FileProcessingEvent> from,
+                                     State<FileProcessingState, FileProcessingEvent> to) {
+                FileProcessingState from_state = null;
+                FileProcessingState to_state = null;
+                if (from != null) {
+                    from_state = from.getId();
+                }
+                if (to != null) {
+                    to_state = to.getId();
+                }
+
+                log.info("State change from {} to {}", from_state, to_state);
+
+                // 检查是否到达最终状态
+                if (to_state == FileProcessingState.COMPLETED
+                        || to_state == FileProcessingState.FAILED
+                        || to_state == FileProcessingState.UPLOADED
+                        || to_state == FileProcessingState.PDF_CONVERTED
+                        || to_state == FileProcessingState.MARKDOWN_CONVERTED
+                ) {
+                    completionLatch.countDown();
+                }
+            }
+        };
+        stateMachine.addStateListener(listener);
         Message<FileProcessingEvent> message = MessageBuilder.withPayload(event)
                 .setHeader("fileInfo", fileInfo)
                 .build();
         // 发送初始事件，开始文件处理流程
-        stateMachine.sendEvent(Mono.just(message)).blockLast(Duration.ofSeconds(10L));
-        log.info("file processing completed");
+        stateMachine.sendEvent(Mono.just(message)).blockLast();
+
+        // 等待处理完成
+        completionLatch.await(30, TimeUnit.SECONDS);
     }
 
     private StateMachine<FileProcessingState, FileProcessingEvent> buildStateMachine(FileProcessingState initState)
-            throws Exception
-    {
+            throws Exception {
         StateMachineBuilder.Builder<FileProcessingState, FileProcessingEvent> builder = StateMachineBuilder.builder();
         builder.configureStates()
                 .withStates()
@@ -126,31 +157,7 @@ public class FileProcessingService
 
         builder.configureConfiguration()
                 .withConfiguration()
-                .autoStartup(true)
-                .listener(new StateMachineListenerAdapter<>()
-                {
-                    @Override
-                    public void eventNotAccepted(Message<FileProcessingEvent> event) {
-                        log.debug("Event not accepted: {}", event);
-                    }
-
-                    @Override
-                    public void stateChanged(State<FileProcessingState, FileProcessingEvent> from,
-                                             State<FileProcessingState, FileProcessingEvent> to)
-                    {
-                        FileProcessingState from_state = null;
-                        FileProcessingState to_state = null;
-                        if (from != null) {
-                            from_state = from.getId();
-                        }
-                        if (to != null) {
-                            to_state = to.getId();
-                        }
-
-                        log.info("State change from {} to {}", from_state, to_state);
-                        //TODO: 在事件监听器中统一更新状态，注意失败时的状态处理
-                    }
-                });
+                .autoStartup(true);
 
         return builder.build();
     }

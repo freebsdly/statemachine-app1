@@ -12,12 +12,10 @@ import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
-public class AiSliceAction implements Action<FileProcessingState, FileProcessingEvent>
-{
+public class AiSliceAction implements Action<FileProcessingState, FileProcessingEvent> {
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
-    {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
             try {
@@ -25,40 +23,31 @@ public class AiSliceAction implements Action<FileProcessingState, FileProcessing
                 FileInfo fileInfo = (FileInfo) context.getMessage().getHeaders().get("fileInfo");
 
                 // 执行文件上传逻辑
-                boolean uploadSuccess = processWithAi(fileInfo);
+                processWithAi(fileInfo);
 
-                if (uploadSuccess) {
-                    // 文件上传成功，触发UPLOAD_SUCCESS事件
-                    message = MessageBuilder
-                            .withPayload(FileProcessingEvent.AI_SLICE_SUCCESS)
-                            .setHeader("fileInfo", fileInfo)
-                            .build();
-                } else {
-                    message = MessageBuilder
-                            .withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
-                            .setHeader("error", "process ai slice failed")
-                            .build();
-                }
-                context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
+                // 文件上传成功，触发UPLOAD_SUCCESS事件
+                message = MessageBuilder
+                        .withPayload(FileProcessingEvent.AI_SLICE_SUCCESS)
+                        .setHeader("fileInfo", fileInfo)
+                        .build();
+
             } catch (Exception e) {
                 message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
                         .setHeader("error", "process ai slice failed")
                         .build();
-                context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
             }
+            context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
         });
     }
 
-    private boolean processWithAi(FileInfo fileInfo) throws Exception
-    {
+    private void processWithAi(FileInfo fileInfo) throws Exception {
         if (fileInfo == null) {
             log.error("file info is null");
-            return false;
+            throw new Exception("file info is null");
         }
         log.info("processing ai slice: {}", fileInfo.getFileName());
         Thread.sleep(4000); // 模拟上传耗时
         log.info("ai slice {} finished", fileInfo.getFileName());
-        return true;
     }
 }
 
