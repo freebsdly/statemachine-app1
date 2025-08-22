@@ -1,0 +1,65 @@
+@startuml 任务状态转换图（含异步回调）
+title 文件处理流程状态转换图
+
+' 定义状态及描述（区分同步流程与异步回调流程）
+state Initial: 初始状态
+state Uploading: 文件上传中
+state Uploaded: 文件上传完成
+state PdfConverting: PDF转换中
+state PdfConverted: PDF已转换
+
+' Markdown转换异步流程状态（提交请求+等待回调）
+state MarkdownConvertSubmitting: 提交Markdown转换请求中
+state MarkdownConvertSubmitted: 提交Markdown转换请求完成
+state MarkdownConverted: Markdown已转换
+
+' Markdown切片异步流程状态（提交请求+等待回调）
+state MarkdownSliceSubmitting: 提交Markdown切片请求中
+state MarkdownSliceSubmitted: 提交Markdown切片请求完成
+state Completed: 任务完成
+state Failed: 任务失败
+
+' 定义状态转换关系
+[*] --> Initial: 状态机启动
+Initial -> Uploading: 上传开始事件
+Uploading -> Uploaded: 上传成功事件
+Uploading -> Failed: 上传失败事件
+
+Uploaded --> PdfConverting: 开始PDF\n转换事件
+PdfConverting -> PdfConverted: PDF转换\n成功事件
+PdfConverting -> Failed: PDF转换\n失败事件
+
+
+' Markdown转换异步流程转换（新增提交请求→等待回调逻辑）
+PdfConverted -> MarkdownConvertSubmitting: 发起Markdown\n转换请求事件
+MarkdownConvertSubmitting --> MarkdownConvertSubmitted: 提交MD转换\n请求成功事件
+MarkdownConvertSubmitted --> MarkdownConverted: MarkDown转换成功
+MarkdownConvertSubmitted --> Failed: MarkDown转换失败
+
+' Markdown切片异步流程转换（新增提交请求→等待回调逻辑）
+MarkdownConverted --> MarkdownSliceSubmitting: 发起Markdown\n切片请求
+MarkdownSliceSubmitting -> MarkdownSliceSubmitted: 请求提交成功\n等待异步回调
+MarkdownSliceSubmitted --> Completed: 切片回调成功\n生成切片成果
+MarkdownSliceSubmitted --> Failed: 切片回调失败/超时
+
+' 异常处理逻辑
+Uploading -> Initial: 重新上传事件
+PdfConverting -> Uploaded: 重新PDF\n转换事件
+MarkdownConvertSubmitting -> PdfConverted: 重新markdown\n转换事件
+MarkdownConvertSubmitted -> PdfConverted: 重新markdown\n转换事件
+MarkdownSliceSubmitting -> MarkdownConverted: 重新Markdown\n切片事件
+MarkdownSliceSubmitted -> MarkdownConverted: 重新Markdown\n切片事件
+'MarkdownSliceSubmitting -> Failed: 强制失败
+'PdfConverting -> Failed: 强制失败
+'Uploading -> Failed: 强制失败
+'Failed -> Completed: 强制完成
+'Completed -> Failed: 强制失败
+
+' 流程终点
+Completed --> [*]
+
+' 添加注释说明异步逻辑
+'note right of MarkdownConvertSubmitted: 异步回调机制：\n1. 提交转换请求后释放资源\n2. 回调通知时唤醒处理流程
+'note left of MarkdownSliceSubmitted: 切片任务异步执行：\n- 支持大文件分片处理\n- 回调携带切片元数据
+'note bottom of MarkdownConvertSubmitting: 提交请求包含：\nPDF文件ID+转换参数\n（标题识别/表格处理等）
+@enduml
