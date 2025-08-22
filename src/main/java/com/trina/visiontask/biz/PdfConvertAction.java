@@ -1,6 +1,7 @@
 package com.trina.visiontask.biz;
 
 import com.aliyun.oss.model.CompleteMultipartUploadResult;
+import com.aliyun.oss.model.OSSObject;
 import com.trina.visiontask.converter.DocumentConverter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -68,14 +70,20 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         }
         FileInfo fileInfo = taskInfo.getFileInfo();
         log.info("converting pdf: {}", fileInfo.getFileName());
-        Flux<DataBuffer> dataBufferFlux = objectStorageService.downloadFlux(fileInfo.getOssFileKey());
-        Flux<DataBuffer> convert = documentConverter.convert(dataBufferFlux, fileInfo.getMimeType(), null);
-        Mono<CompleteMultipartUploadResult> resultMono = objectStorageService.uploadFlux(UUID.randomUUID().toString(), convert);
-        CompleteMultipartUploadResult result = resultMono.block();
-        if (result == null) {
-            log.error("convert pdf {} failed", fileInfo.getFileName());
-            throw new Exception("convert pdf failed");
+        Optional<OSSObject> download = objectStorageService.download(fileInfo.getOssFileKey()).blockOptional();
+        if (download.isEmpty()) {
+            throw new Exception("file not found");
         }
+        OSSObject ossObject = download.get();
+        long contentLength = ossObject.getObjectMetadata().getContentLength();
+        String uploadName = String.format("%s.%s", UUID.randomUUID(), "pdf");
+        Flux<DataBuffer> convert = documentConverter.convert(ossObject.getObjectContent(), uploadName, contentLength, null);
+        Optional<CompleteMultipartUploadResult> uploadResult = objectStorageService.uploadFlux(uploadName, convert).blockOptional();
+        if (uploadResult.isEmpty()) {
+            log.error("upload pdf {} failed", fileInfo.getFileName());
+            throw new Exception("upload pdf failed");
+        }
+        CompleteMultipartUploadResult result = uploadResult.get();
         fileInfo.setOssPDFKey(result.getKey());
         fileInfo.setPdfPath(result.getLocation());
         log.info("convert pdf {} finished", fileInfo.getFileName());

@@ -167,7 +167,7 @@ public class ObjectStorageService {
      * @param ossFileName OSS中的文件名
      * @return 文件输入流
      */
-    public Mono<InputStream> download(String ossFileName) {
+    public Mono<OSSObject> download(String ossFileName) {
         // 异步执行下载操作，避免阻塞
         return Mono.fromCallable(() -> {
             // 检查文件是否存在
@@ -177,8 +177,7 @@ public class ObjectStorageService {
 
             // 获取OSS文件输入流
             GetObjectRequest request = new GetObjectRequest(options.getBucketName(), ossFileName);
-            OSSObject ossObject = ossClient.getObject(request);
-            return ossObject.getObjectContent();
+            return ossClient.getObject(request);
         }).subscribeOn(Schedulers.boundedElastic());
     }
 

@@ -57,6 +57,7 @@ public class Config {
                 .build();
     }
 
+
     @Bean
     public OSS ossClient(@Qualifier("objectStorageOptions") ObjectStorageOptions options) {
         return new OSSClientBuilder()
