@@ -1,15 +1,11 @@
 package com.trina.visiontask.converter;
 
-import com.trina.visiontask.exception.ConversionException;
-import com.trina.visiontask.exception.UnsupportedFormatException;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Set;
 
 /**

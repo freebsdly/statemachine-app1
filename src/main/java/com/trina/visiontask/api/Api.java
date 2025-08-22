@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -30,42 +29,39 @@ import java.util.UUID;
 
 @Slf4j
 @RestController
-public class Api implements ApiDoc {
+public class Api implements ApiDoc
+{
 
     private final MessageProducer messageProducer;
     private final ObjectStorageService objectStorageService;
     private final DocumentConverter pdfDocumentConverter;
-    private final DataBufferFactory dataBufferFactory;
 
     public Api(MessageProducer messageProducer,
                ObjectStorageService objectStorageService,
-               @Qualifier("PDFDocumentConverter") DocumentConverter pdfDocumentConverter,
-               @Qualifier("dataBufferFactory") DataBufferFactory dataBufferFactory
-    ) {
+               @Qualifier("PDFDocumentConverter") DocumentConverter pdfDocumentConverter
+              )
+    {
         this.messageProducer = messageProducer;
         this.objectStorageService = objectStorageService;
         this.pdfDocumentConverter = pdfDocumentConverter;
-        this.dataBufferFactory = dataBufferFactory;
     }
 
 
     @Override
     @PostMapping("/process-file")
-    public String processFile(@RequestBody TaskInfo info) throws Exception {
+    public ApiBody<String> processFile(@RequestBody TaskInfo info) throws Exception
+    {
         messageProducer.sendToUploadQueue(info);
-        return "文件处理流程已启动";
+        return ApiBody.success();
     }
 
     @Override
     @PostMapping(value = "/upload-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public TaskInfo uploadFile(@RequestParam("file") MultipartFile file) throws Exception {
+    public ApiBody<TaskInfo> uploadFile(@RequestParam("file") MultipartFile file) throws Exception
+    {
         // 构造TaskInfo对象
         TaskInfo taskInfo = new TaskInfo();
         taskInfo.setId(UUID.randomUUID());
-        if (file.isEmpty()) {
-            taskInfo.setMessage("文件为空");
-            return taskInfo;
-        }
         String suffix = null;
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isEmpty()) {
@@ -94,13 +90,14 @@ public class Api implements ApiDoc {
 
         // 发送到处理队列
         messageProducer.sendToPdfConvertQueue(taskInfo);
-        return taskInfo;
+        return ApiBody.success(taskInfo);
 
     }
 
     @GetMapping("/download-file")
     @Override
-    public ResponseEntity<InputStreamResource> downloadFile(String file) throws Exception {
+    public ResponseEntity<InputStreamResource> downloadFile(String file) throws Exception
+    {
         Optional<OSSObject> download = objectStorageService.download(file).blockOptional();
         if (download.isEmpty()) {
             throw new Exception("file not found");
@@ -112,7 +109,8 @@ public class Api implements ApiDoc {
         HttpHeaders headers = new HttpHeaders();
         // 编码文件名，防止中文乱码
         String encodedFileName = URLEncoder.encode(file, StandardCharsets.UTF_8);
-        headers.add(HttpHeaders.CONTENT_DISPOSITION,
+        headers.add(
+                HttpHeaders.CONTENT_DISPOSITION,
                 "attachment; filename*=UTF-8''" + encodedFileName);
 
         // 返回响应实体
@@ -125,16 +123,17 @@ public class Api implements ApiDoc {
 
     @PostMapping(value = "/converts", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Override
-    public String convertFileToPdf(MultipartFile file) throws Exception {
+    public ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception
+    {
         if (file.isEmpty()) {
             throw new Exception("file is empty");
         }
 
         Flux<DataBuffer> convert = pdfDocumentConverter.convert(file, null);
         DataBufferUtils.write(convert, Path.of("E:/1.pdf"),
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-                StandardOpenOption.WRITE).block();
-        return "ok";
+                              StandardOpenOption.CREATE,
+                              StandardOpenOption.TRUNCATE_EXISTING,
+                              StandardOpenOption.WRITE).block();
+        return ApiBody.success();
     }
 }

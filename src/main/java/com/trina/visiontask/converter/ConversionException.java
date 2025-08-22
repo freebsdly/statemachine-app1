@@ -1,4 +1,4 @@
-package com.trina.visiontask.exception;
+package com.trina.visiontask.converter;
 
 /**
  * 转换过程中发生的通用异常

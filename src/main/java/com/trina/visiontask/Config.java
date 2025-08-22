@@ -1,5 +1,6 @@
 package com.trina.visiontask;
 
+import com.aliyun.oss.ClientBuilderConfiguration;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.trina.visiontask.biz.ObjectStorageOptions;
@@ -20,52 +21,71 @@ import reactor.netty.http.client.HttpClient;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
-public class Config {
+public class Config
+{
 
     @Bean
-    public String taskInfoKey() {
+    public String taskInfoKey()
+    {
         return "task.info";
     }
 
     @Bean
-    public long waitTimeout() {
+    public long waitTimeout()
+    {
         return 30;
     }
 
     @Bean
     @ConfigurationProperties(prefix = "pdf-convert.api")
-    public ConverterOptions converterOptions() {
+    public ConverterOptions converterOptions()
+    {
         return new ConverterOptions();
     }
 
     @Bean
     @ConfigurationProperties(prefix = "oss")
-    public ObjectStorageOptions objectStorageOptions() {
+    public ObjectStorageOptions objectStorageOptions()
+    {
         return new ObjectStorageOptions();
     }
 
     @Bean
-    public WebClient webClient(@Qualifier("converterOptions") ConverterOptions options) {
+    @ConfigurationProperties(prefix = "oss.client")
+    public ClientBuilderConfiguration clientBuilderConfiguration()
+    {
+        return new ClientBuilderConfiguration();
+    }
+
+    @Bean
+    public WebClient webClient(@Qualifier("converterOptions") ConverterOptions options)
+    {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, options.getConnectTimeout())
                 .doOnConnected(conn -> conn
-                        .addHandlerLast(new ReadTimeoutHandler(options.getReadTimeout(), TimeUnit.MILLISECONDS))
-                        .addHandlerLast(new WriteTimeoutHandler(options.getWriteTimeout(), TimeUnit.MILLISECONDS))
-                );
+                                       .addHandlerLast(new ReadTimeoutHandler(options.getReadTimeout(), TimeUnit.MILLISECONDS))
+                                       .addHandlerLast(new WriteTimeoutHandler(options.getWriteTimeout(), TimeUnit.MILLISECONDS))
+                              );
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .build();
     }
 
-
     @Bean
-    public OSS ossClient(@Qualifier("objectStorageOptions") ObjectStorageOptions options) {
+    public OSS ossClient(@Qualifier("objectStorageOptions") ObjectStorageOptions options,
+                         ClientBuilderConfiguration clientBuilderConfiguration)
+    {
         return new OSSClientBuilder()
-                .build(options.getEndpoint(), options.getAccessKey(), options.getAccessSecret());
+                .build(
+                        options.getEndpoint(),
+                        options.getAccessKey(),
+                        options.getAccessSecret(),
+                        clientBuilderConfiguration);
     }
 
     @Bean
-    public DataBufferFactory dataBufferFactory() {
+    public DataBufferFactory dataBufferFactory()
+    {
         return new DefaultDataBufferFactory();
     }
 }

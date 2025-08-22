@@ -8,17 +8,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Vision Task API")
-public interface ApiDoc {
+public interface ApiDoc
+{
 
     @Operation(description = "File Processing")
-    public String processFile(TaskInfo info) throws Exception;
+    public ApiBody<String> processFile(TaskInfo info) throws Exception;
 
     @Operation(description = "Upload File")
-    public TaskInfo uploadFile(MultipartFile file) throws Exception;
+    public ApiBody<TaskInfo> uploadFile(MultipartFile file) throws Exception;
 
     @Operation(description = "Download File")
     public ResponseEntity<InputStreamResource> downloadFile(String file) throws Exception;
 
     @Operation(description = "Convert File to PDF")
-    public String convertFileToPdf(MultipartFile file) throws Exception;
+    public ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception;
 }
