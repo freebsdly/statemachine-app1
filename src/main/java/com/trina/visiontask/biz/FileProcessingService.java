@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineBuilder;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
@@ -61,6 +62,13 @@ public class FileProcessingService
 
         StateMachineListenerAdapter<FileProcessingState, FileProcessingEvent> listener = new StateMachineListenerAdapter<>()
         {
+            private StateContext<FileProcessingState, FileProcessingEvent> context;
+
+            @Override
+            public void stateContext(StateContext<FileProcessingState, FileProcessingEvent> stateContext)
+            {
+                this.context = stateContext;
+            }
 
             @Override
             public void transitionEnded(Transition<FileProcessingState, FileProcessingEvent> transition)
@@ -68,9 +76,10 @@ public class FileProcessingService
                 FileProcessingState source = transition.getSource().getId();
                 FileProcessingState target = transition.getTarget().getId();
                 FileProcessingEvent event = transition.getTrigger().getEvent();
+                TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
 
                 log.info("State changed from {} to {}, triggered by {}", source, target, event);
-                // TODO: 统一记录日志
+                logTaskInfo(taskInfo);
 
                 // 检查是否到达最终状态
                 if (target == FileProcessingState.COMPLETED
@@ -83,6 +92,11 @@ public class FileProcessingService
                 ) {
                     completionLatch.countDown();
                 }
+            }
+
+            private void logTaskInfo(TaskInfo taskInfo)
+            {
+                log.info("TaskInfo: {}", taskInfo);
             }
         };
         stateMachine.addStateListener(listener);

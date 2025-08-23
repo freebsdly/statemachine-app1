@@ -60,6 +60,7 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.PDF_CONVERT_FAILURE)
                         .setHeader("error", e.getMessage())
+                        .setHeader(taskInfoKey, taskInfo)
                         .build();
 
             }
