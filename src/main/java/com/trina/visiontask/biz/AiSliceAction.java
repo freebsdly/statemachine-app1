@@ -10,19 +10,28 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
-public class AiSliceAction implements Action<FileProcessingState, FileProcessingEvent> {
+public class AiSliceAction implements Action<FileProcessingState, FileProcessingEvent>
+{
 
     private final String taskInfoKey;
+    private final long timeout;
 
-    public AiSliceAction(@Qualifier("taskInfoKey") String taskInfoKey) {
+    public AiSliceAction(
+            @Qualifier("taskInfoKey") String taskInfoKey,
+            @Qualifier("aiSliceTaskTimeout") long timeout
+                        )
+    {
         this.taskInfoKey = taskInfoKey;
+        this.timeout = timeout;
     }
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
+    {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
             TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
@@ -39,10 +48,12 @@ public class AiSliceAction implements Action<FileProcessingState, FileProcessing
                         .build();
             }
             context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
-        });
+        }).orTimeout(timeout, TimeUnit.SECONDS);
+        ;
     }
 
-    private TaskInfo processWithAi(TaskInfo taskInfo) throws Exception {
+    private TaskInfo processWithAi(TaskInfo taskInfo) throws Exception
+    {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             throw new Exception("file info is null");
         }

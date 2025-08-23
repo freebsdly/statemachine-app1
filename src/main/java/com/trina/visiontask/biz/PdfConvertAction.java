@@ -17,10 +17,12 @@ import reactor.core.publisher.Mono;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
-public class PdfConvertAction implements Action<FileProcessingState, FileProcessingEvent> {
+public class PdfConvertAction implements Action<FileProcessingState, FileProcessingEvent>
+{
 
     private final ObjectStorageService objectStorageService;
     private final DocumentConverter documentConverter;
@@ -32,7 +34,8 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
             ObjectStorageService objectStorageService,
             MessageProducer messageProducer,
             @Qualifier("taskInfoKey") String taskInfoKey
-    ) {
+                           )
+    {
         this.documentConverter = documentConverter;
         this.objectStorageService = objectStorageService;
         this.messageProducer = messageProducer;
@@ -40,7 +43,8 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
     }
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
+    {
         CompletableFuture.runAsync(() -> {
             log.info("start converting pdf");
             Message<FileProcessingEvent> message;
@@ -60,10 +64,12 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
 
             }
             context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
-        });
+        }).orTimeout(300, TimeUnit.SECONDS);
+        ;
     }
 
-    private TaskInfo convertToPdf(TaskInfo taskInfo) throws Exception {
+    private TaskInfo convertToPdf(TaskInfo taskInfo) throws Exception
+    {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
             throw new Exception("file info is null");
@@ -77,8 +83,14 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         OSSObject ossObject = download.get();
         long contentLength = ossObject.getObjectMetadata().getContentLength();
         String uploadName = String.format("%s.%s", UUID.randomUUID(), "pdf");
-        Flux<DataBuffer> convert = documentConverter.convert(ossObject.getObjectContent(), uploadName, contentLength, null);
-        Optional<CompleteMultipartUploadResult> uploadResult = objectStorageService.uploadFlux(uploadName, convert).blockOptional();
+        Flux<DataBuffer> convert = documentConverter.convert(
+                ossObject.getObjectContent(),
+                uploadName,
+                contentLength,
+                null);
+        Optional<CompleteMultipartUploadResult> uploadResult = objectStorageService
+                .uploadFlux(uploadName, convert)
+                .blockOptional();
         if (uploadResult.isEmpty()) {
             log.error("upload pdf {} failed", fileInfo.getFileName());
             throw new Exception("upload pdf failed");

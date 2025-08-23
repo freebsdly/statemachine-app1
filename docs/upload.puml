@@ -1,0 +1,44 @@
+@startuml
+actor User
+participant "Api" as API
+participant "UploadQueue" as UQ
+participant "UploadConsumer" as UP
+participant "PdfConvertQueue" as PCQ
+participant "ObjectStorageService" as OSS
+participant "OSS Server" as OSSS
+
+User -> API : POST /upload-file\n(file)
+activate API
+
+
+API -> API : 构造 TaskInfo 和 FileInfo
+API -> OSS : upload(uploadName, file)
+activate OSS
+
+OSS -> OSSS : 上传文件
+activate OSSS
+OSSS --> OSS : 返回上传结果
+deactivate OSSS
+
+OSS --> API : 返回 CompleteMultipartUploadResult
+deactivate OSS
+
+API -> UQ : sendToUploadQueue(taskInfo)\n[记录日志]
+activate UQ
+
+API --> User : 返回 ApiBody<TaskInfo>
+deactivate API
+
+UP -> UQ : 消费消息
+activate UP
+UQ --> UP : 获取 taskInfo
+deactivate UQ
+
+UP -> UP : 记录详细日志和状态
+UP -> PCQ : sendToPdfConvertQueue(taskInfo)\n[转发到转换队列]
+activate PCQ
+PCQ --> UP : 消息入队成功
+deactivate PCQ
+
+deactivate UP
+@enduml

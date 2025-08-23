@@ -37,6 +37,30 @@ public class Config
     }
 
     @Bean
+    public long uploadTaskTimeout()
+    {
+        return 300;
+    }
+
+    @Bean
+    public long pdfConvertTaskTimeout()
+    {
+        return 300;
+    }
+
+    @Bean
+    public long mdConvertTaskTimeout()
+    {
+        return 300;
+    }
+
+    @Bean
+    public long aiSliceTaskTimeout()
+    {
+        return 300;
+    }
+
+    @Bean
     @ConfigurationProperties(prefix = "pdf-convert.api")
     public ConverterOptions converterOptions()
     {

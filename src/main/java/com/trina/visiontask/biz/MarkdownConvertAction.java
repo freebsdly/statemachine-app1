@@ -10,21 +10,25 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
-public class MarkdownConvertAction implements Action<FileProcessingState, FileProcessingEvent> {
+public class MarkdownConvertAction implements Action<FileProcessingState, FileProcessingEvent>
+{
 
     private final MessageProducer messageProducer;
     private final String taskInfoKey;
 
-    public MarkdownConvertAction(MessageProducer messageProducer, @Qualifier("taskInfoKey") String taskInfoKey) {
+    public MarkdownConvertAction(MessageProducer messageProducer, @Qualifier("taskInfoKey") String taskInfoKey)
+    {
         this.messageProducer = messageProducer;
         this.taskInfoKey = taskInfoKey;
     }
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
+    {
         CompletableFuture.runAsync(() -> {
             log.info("start converting markdown");
             Message<FileProcessingEvent> message;
@@ -43,10 +47,12 @@ public class MarkdownConvertAction implements Action<FileProcessingState, FilePr
                         .build();
             }
             context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
-        });
+        }).orTimeout(30, TimeUnit.SECONDS);
+        ;
     }
 
-    private TaskInfo convertToMarkdown(TaskInfo taskInfo) throws Exception {
+    private TaskInfo convertToMarkdown(TaskInfo taskInfo) throws Exception
+    {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
             throw new Exception("file info is null");

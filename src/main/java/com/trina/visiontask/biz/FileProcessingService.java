@@ -7,7 +7,7 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineBuilder;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
-import org.springframework.statemachine.state.State;
+import org.springframework.statemachine.transition.Transition;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -52,8 +52,7 @@ public class FileProcessingService
         this.waitTimeout = timeout;
     }
 
-
-    public boolean processFile(FileProcessingState initState, FileProcessingEvent event, TaskInfo taskInfo)
+    public void processFile(FileProcessingState initState, FileProcessingEvent event, TaskInfo taskInfo)
             throws Exception
     {
         // 这里使用builder创建状态机，以便从指定的初始状态开始，以便从指定的初始状态开始，例如文件已经上传，从UPLOADED状态开始，发送事件PDF_CONVERT_START事件，开始PDF转换
@@ -62,27 +61,25 @@ public class FileProcessingService
 
         StateMachineListenerAdapter<FileProcessingState, FileProcessingEvent> listener = new StateMachineListenerAdapter<>()
         {
-            @Override
-            public void stateChanged(State<FileProcessingState, FileProcessingEvent> from,
-                                     State<FileProcessingState, FileProcessingEvent> to)
-            {
-                FileProcessingState from_state = null;
-                FileProcessingState to_state = null;
-                if (from != null) {
-                    from_state = from.getId();
-                }
-                if (to != null) {
-                    to_state = to.getId();
-                }
 
-                log.info("State change from {} to {}", from_state, to_state);
+            @Override
+            public void transitionEnded(Transition<FileProcessingState, FileProcessingEvent> transition)
+            {
+                FileProcessingState source = transition.getSource().getId();
+                FileProcessingState target = transition.getTarget().getId();
+                FileProcessingEvent event = transition.getTrigger().getEvent();
+
+                log.info("State changed from {} to {}, triggered by {}", source, target, event);
+                // TODO: 统一记录日志
 
                 // 检查是否到达最终状态
-                if (to_state == FileProcessingState.COMPLETED
-                        || to_state == FileProcessingState.FAILED
-                        || to_state == FileProcessingState.UPLOADED
-                        || to_state == FileProcessingState.PDF_CONVERTED
-                        || to_state == FileProcessingState.MARKDOWN_CONVERTED
+                if (target == FileProcessingState.COMPLETED
+                        || target == FileProcessingState.FAILED
+                        || target == FileProcessingState.UPLOADED
+                        || target == FileProcessingState.PDF_CONVERTED
+                        || target == FileProcessingState.MARKDOWN_CONVERT_SUBMITTED
+                        || target == FileProcessingState.MARKDOWN_CONVERTED
+                        || target == FileProcessingState.AI_SLICE_SUBMITTED
                 ) {
                     completionLatch.countDown();
                 }
@@ -96,7 +93,7 @@ public class FileProcessingService
         stateMachine.sendEvent(Mono.just(message)).blockLast();
 
         // 等待处理完成
-        return completionLatch.await(waitTimeout, TimeUnit.SECONDS);
+        completionLatch.await(waitTimeout, TimeUnit.SECONDS);
     }
 
     private StateMachine<FileProcessingState, FileProcessingEvent> buildStateMachine(FileProcessingState initState)
@@ -183,36 +180,35 @@ public class FileProcessingService
                 .event(FileProcessingEvent.MD_CONVERT_FAILURE)
                 .action(failureAction)
                 .and()
-                // Markdown转换完成 -> AI切片已提交
+                // Markdown转换完成 -> AI切片提交中
                 .withExternal()
                 .source(FileProcessingState.MARKDOWN_CONVERTED)
-                .target(FileProcessingState.AI_SLICE_SUBMITTED)
+                .target(FileProcessingState.AI_SLICE_SUBMITTING)
                 .event(FileProcessingEvent.AI_SLICE_START)
                 .action(aiSliceAction)
                 .and()
-                // Markdown转换完成 -> AI切片提交失败
+                // AI切片请求提交中 -> AI切片请求已提交
                 .withExternal()
-                .source(FileProcessingState.MARKDOWN_CONVERTED)
+                .source(FileProcessingState.AI_SLICE_SUBMITTING)
+                .target(FileProcessingState.AI_SLICE_SUBMITTED)
+                .event(FileProcessingEvent.AI_SLICE_SUBMIT_SUCCESS)
+                .and()
+                // AI切片请求提交中 -> 失败
+                .withExternal()
+                .source(FileProcessingState.AI_SLICE_SUBMITTING)
                 .target(FileProcessingState.FAILED)
-                .event(FileProcessingEvent.AI_SLICE_FAILURE)
+                .event(FileProcessingEvent.AI_SLICE_SUBMIT_FAILURE)
                 .action(failureAction)
                 .and()
-                // AI切片已提交 -> AI处理中
+                // AI切片请求已提交 -> AI处理完成
                 .withExternal()
-                .source(FileProcessingState.AI_SLICE_SUBMITTED).target(FileProcessingState.AI_SLICING)
-                .event(FileProcessingEvent.AI_SLICE_SUCCESS)
-                .action(aiSliceAction)
-                .and()
-                // AI处理中 -> AI处理完成
-                // AI处理中 -> 全部完成
-                .withExternal()
-                .source(FileProcessingState.AI_SLICING)
+                .source(FileProcessingState.AI_SLICE_SUBMITTED)
                 .target(FileProcessingState.COMPLETED)
                 .event(FileProcessingEvent.AI_SLICE_SUCCESS)
                 .and()
-                // AI处理中 -> 失败
+                // AI切片请求已提交 -> 失败
                 .withExternal()
-                .source(FileProcessingState.AI_SLICING)
+                .source(FileProcessingState.AI_SLICE_SUBMITTED)
                 .target(FileProcessingState.FAILED)
                 .event(FileProcessingEvent.AI_SLICE_FAILURE)
                 .action(failureAction);

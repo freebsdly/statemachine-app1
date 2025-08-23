@@ -7,7 +7,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-public class MessageProducer {
+public class MessageProducer
+{
 
     private final RabbitTemplate rabbitTemplate;
     private final MQConfiguration uploadConfig;
@@ -19,7 +20,8 @@ public class MessageProducer {
                            @Qualifier("uploadConfiguration") MQConfiguration uploadConfig,
                            @Qualifier("pdfConvertConfiguration") MQConfiguration pdfConvertConfig,
                            @Qualifier("mdConvertConfiguration") MQConfiguration mdConvertConfig,
-                           @Qualifier("aiSliceConfiguration") MQConfiguration aiSliceConfig) {
+                           @Qualifier("aiSliceConfiguration") MQConfiguration aiSliceConfig)
+    {
         this.rabbitTemplate = rabbitTemplate;
         this.uploadConfig = uploadConfig;
         this.pdfConvertConfig = pdfConvertConfig;
@@ -28,35 +30,32 @@ public class MessageProducer {
     }
 
 
-    public void sendToUploadQueue(TaskInfo info) throws AmqpException {
+    public void sendToUploadQueue(TaskInfo info) throws AmqpException
+    {
         sendMessage(uploadConfig, info);
     }
 
-    public void sendToPdfConvertQueue(TaskInfo info) throws AmqpException {
+    public void sendToPdfConvertQueue(TaskInfo info) throws AmqpException
+    {
         sendMessage(pdfConvertConfig, info);
     }
 
-    public void sendToMdConvertQueue(TaskInfo info) throws AmqpException {
+    public void sendToMdConvertQueue(TaskInfo info) throws AmqpException
+    {
         sendMessage(mdConvertConfig, info);
     }
 
-    public void sendToAiSliceQueue(TaskInfo info) throws AmqpException {
+    public void sendToAiSliceQueue(TaskInfo info) throws AmqpException
+    {
         sendMessage(aiSliceConfig, info);
     }
 
-    private void sendMessage(MQConfiguration config, TaskInfo info) throws AmqpException {
+    private void sendMessage(MQConfiguration config, TaskInfo info) throws AmqpException
+    {
         rabbitTemplate.convertAndSend(config.getExchangeName(), config.getRoutingKey(), info, message -> {
             // 设置优先级属性
-            int priority = calculatePriority(info);
-            message.getMessageProperties().setPriority(priority);
+            message.getMessageProperties().setPriority(info.getPriority());
             return message;
         });
     }
-
-    public int calculatePriority(TaskInfo info) {
-        // Calculate priority based on file size
-        return 5;
-    }
-
-
 }
