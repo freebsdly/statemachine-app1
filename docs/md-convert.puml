@@ -1,0 +1,38 @@
+@startuml
+
+participant API
+participant "StateMachine" as SM
+participant "MarkdownConvertAction" as Action
+participant "MessageProducer" as Producer
+queue "MD Convert Queue" as MdQueue
+participant "MD Consumer" as Consumer
+participant "MD Converter" as Converter
+queue "AI Slice Queue" as AiQueue
+
+Consumer -> MdQueue : 从队列消费消息
+return: 获取消息
+Consumer -> SM : 启动状态机
+SM -> Action : execute
+Action -> Converter: 提交转换请求
+return : 提交结果
+Action -> Producer : sendToMdConvertQueue(taskInfo)
+
+Producer -> MdQueue : 发送消息到队列
+Producer --> Action : 消息发送成功
+
+
+Action -> SM : 发送MD_CONVERT_SUBMIT_SUCCESS事件
+
+
+Converter -> API: 回调返回markdown转换结果
+API -> API: 上传markdown文件
+API -> Producer: sendToMdConvertQueue(taskInfo)
+Producer -> MdQueue : 推送消息到队列
+Consumer -> Producer : sendToAiSliceQueue(taskInfo)
+
+Producer -> AiQueue : 发送消息到AI切片队列
+Producer --> Consumer : 消息发送成功
+
+Consumer -> SM : 发送MD_CONVERT_SUCCESS事件
+
+@enduml

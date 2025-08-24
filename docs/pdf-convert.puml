@@ -1,0 +1,39 @@
+@startuml
+
+participant "StateMachine" as SM
+queue "PDF Convert Queue" as PdfQueue
+participant "PdfConvertAction" as Action
+queue "MD Convert Queue" as MdQueue
+participant "ObjectStorageService" as OSS
+participant "DocumentConverter" as Converter
+
+
+loop 异步处理
+    PdfQueue -> Action : 接收转换任务
+    activate Action
+    Action -> OSS : 下载文件\ndownload(fileKey)
+    activate OSS
+    OSS --> Action : 返回OSSObject
+    deactivate OSS
+
+    Action -> Converter : 转换为PDF\nconvert(inputStream)
+    activate Converter
+    Converter --> Action : 返回Flux<DataBuffer>
+    deactivate Converter
+
+    Action -> OSS : 上传PDF文件\nuploadFlux
+    activate OSS
+    OSS --> Action : 返回上传结果
+    deactivate OSS
+
+    Action -> MdQueue : 发送至MD转换队列\nsendToMdConvertQueue
+    Action -> SM : 发送转换结果事件
+    deactivate Action
+end
+
+SM -> SM : 处理PDF转换成功事件
+activate SM
+SM --> SM : 进入下一处理阶段
+deactivate SM
+
+@enduml

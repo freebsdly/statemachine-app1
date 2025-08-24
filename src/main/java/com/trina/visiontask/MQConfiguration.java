@@ -29,4 +29,24 @@ public class MQConfiguration
      * RabbitMQ Queue x-max-priority
      */
     private Integer xMaxPriority;
+
+    /**
+     * RabbitMQ Consumer max concurrent consumers
+     */
+    private Integer maxConcurrentConsumers;
+
+    /**
+     * RabbitMQ Consumer concurrent consumers
+     */
+    private Integer concurrentConsumers;
+
+    /**
+     * RabbitMQ Consumer prefetch
+     */
+    private Integer prefetch;
+
+    /**
+     * RabbitMQ Consumer acknowledge mode
+     */
+    private String acknowledgeMode;
 }
