@@ -6,7 +6,6 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -23,8 +22,8 @@ public class PDFDocumentConverter implements DocumentConverter {
     private final ConverterOptions converterOptions;
 
     public PDFDocumentConverter(
-            @Qualifier("webClient") WebClient webClient,
-            @Qualifier("converterOptions") ConverterOptions converterOptions) {
+            @Qualifier("pdfConvertWebClient") WebClient webClient,
+            @Qualifier("pdfConverterOptions") ConverterOptions converterOptions) {
         this.webClient = webClient;
         this.converterOptions = converterOptions;
     }
@@ -37,31 +36,6 @@ public class PDFDocumentConverter implements DocumentConverter {
     @Override
     public Set<String> getSupportedOutputFormats() {
         return Set.of("pdf");
-    }
-
-    @Override
-    public Flux<DataBuffer> convert(MultipartFile file, ConversionOptions options) throws ConversionException, IOException {
-        org.springframework.core.io.InputStreamResource resource =
-                new InputStreamResource(file.getInputStream()) {
-                    @Override
-                    public String getFilename() {
-                        return file.getOriginalFilename();
-                    }
-
-                    @Override
-                    public long contentLength() {
-                        return file.getSize();
-                    }
-                };
-
-
-        return webClient.post()
-                .uri(converterOptions.getUrl())
-                .headers(headers -> converterOptions.headers.forEach(headers::add))
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData("files", resource))
-                .exchangeToFlux(response -> response.bodyToFlux(DataBuffer.class));
-
     }
 
     @Override
@@ -82,7 +56,6 @@ public class PDFDocumentConverter implements DocumentConverter {
 
         return webClient.post()
                 .uri(converterOptions.getUrl())
-                .headers(headers -> converterOptions.headers.forEach(headers::add))
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(BodyInserters.fromMultipartData("files", resource))
                 .exchangeToFlux(response -> response.bodyToFlux(DataBuffer.class));

@@ -26,8 +26,8 @@ public class MarkdownConvertConsumer {
             processMessage(taskInfo);
             channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         } catch (Exception e) {
+            long retryCount = message.getMessageProperties().getRetryCount();
             log.warn("consume md convert message failed, {}", e.getMessage());
-            // 可以根据需要进行消息重试或死信队列处理
             channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, true);
         }
     }

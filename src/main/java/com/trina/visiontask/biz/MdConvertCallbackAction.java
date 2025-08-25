@@ -9,70 +9,60 @@ import org.springframework.statemachine.action.Action;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
-public class FileUploadAction implements Action<FileProcessingState, FileProcessingEvent>
-{
-
-    private final ObjectStorageService objectStorageService;
+public class MdConvertCallbackAction implements Action<FileProcessingState, FileProcessingEvent> {
     private final MessageProducer messageProducer;
     private final String taskInfoKey;
     private final long timeout;
 
-    public FileUploadAction(
-            ObjectStorageService objectStorageService,
+    public MdConvertCallbackAction(
             MessageProducer messageProducer,
             @Qualifier("taskInfoKey") String taskInfoKey,
-            @Qualifier("uploadTaskTimeout") long timeout)
-    {
-        this.objectStorageService = objectStorageService;
+            @Qualifier("mdConvertTaskTimeout") long timeout
+    ) {
         this.messageProducer = messageProducer;
         this.taskInfoKey = taskInfoKey;
         this.timeout = timeout;
     }
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
-    {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
             TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
             try {
-                taskInfo = uploadFile(taskInfo);
+                convertToMarkdownCallback(taskInfo);
                 message = MessageBuilder
-                        .withPayload(FileProcessingEvent.UPLOAD_SUCCESS)
+                        .withPayload(FileProcessingEvent.MD_CONVERT_SUCCESS)
                         .setHeader(taskInfoKey, taskInfo)
                         .build();
             } catch (Exception e) {
                 if (taskInfo != null) {
                     taskInfo.setMessage(e.getMessage());
                 }
-                message = MessageBuilder.withPayload(FileProcessingEvent.UPLOAD_FAILURE)
-                        .setHeader("error", "upload file failed")
+                message = MessageBuilder
+                        .withPayload(FileProcessingEvent.MD_CONVERT_FAILURE)
+                        .setHeader("error", "convert markdown callback failed")
                         .setHeader(taskInfoKey, taskInfo)
                         .build();
-
             }
-            context.getStateMachine().sendEvent(Mono.just(message))
-                    .blockLast();
+            context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
         }).orTimeout(timeout, TimeUnit.SECONDS);
     }
 
-    // 这里只处理从网络存储获取文件并上传到对象存储的逻辑
-    private TaskInfo uploadFile(TaskInfo taskInfo) throws Exception
-    {
+    private void convertToMarkdownCallback(TaskInfo taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
+            log.error("file info is null");
             throw new Exception("file info is null");
         }
-        // TODO: 实现文件上传逻辑
-        FileInfo fileInfo = taskInfo.getFileInfo();
-        log.info("start uploading file {}", fileInfo.getFileName());
-
-        log.info("upload file {} finished", fileInfo.getFileName());
-        messageProducer.sendToPdfConvertQueue(taskInfo);
-        return taskInfo;
+        if (taskInfo.getEndTime() == null) {
+            taskInfo.setEndTime(LocalDateTime.now());
+        }
+        messageProducer.sendToAiSliceQueue(taskInfo);
     }
 }

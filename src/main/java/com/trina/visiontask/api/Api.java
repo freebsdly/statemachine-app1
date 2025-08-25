@@ -2,10 +2,7 @@ package com.trina.visiontask.api;
 
 import com.aliyun.oss.model.CompleteMultipartUploadResult;
 import com.aliyun.oss.model.OSSObject;
-import com.trina.visiontask.biz.FileInfo;
-import com.trina.visiontask.biz.MessageProducer;
-import com.trina.visiontask.biz.ObjectStorageService;
-import com.trina.visiontask.biz.TaskInfo;
+import com.trina.visiontask.biz.*;
 import com.trina.visiontask.converter.DocumentConverter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -24,6 +21,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -48,16 +46,18 @@ public class Api implements ApiDoc {
     @Override
     @PostMapping("/process-file")
     public ApiBody<String> processFile(@RequestBody TaskInfo info) throws Exception {
+        // TODO: 根据初始状态和事件判断发送到哪个处理队列
         messageProducer.sendToUploadQueue(info);
         return ApiBody.success();
     }
 
     @Override
-    @PostMapping(value = "/upload-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiBody<TaskInfo> uploadFile(@RequestParam("file") MultipartFile file) throws Exception {
         // 构造TaskInfo对象
         TaskInfo taskInfo = new TaskInfo();
         taskInfo.setId(UUID.randomUUID());
+        taskInfo.setStartTime(LocalDateTime.now());
         String suffix = null;
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isEmpty()) {
@@ -83,16 +83,19 @@ public class Api implements ApiDoc {
         fileInfo.setFilePath(result.getLocation());
         fileInfo.setFileSize(file.getSize());
         taskInfo.setFileInfo(fileInfo);
+        taskInfo.setEndTime(LocalDateTime.now());
 
-        // 发送到处理队列
+        // 发送到处理队列, 文件已经上传这里设置初始状态发送给处理队列更新状态
+        taskInfo.setCurrentState(FileProcessingState.INITIAL);
+        taskInfo.setEvent(FileProcessingEvent.UPLOAD_START);
         messageProducer.sendToUploadQueue(taskInfo);
         return ApiBody.success(taskInfo);
 
     }
 
-    @GetMapping("/download-file")
+    @GetMapping("/files/{id}")
     @Override
-    public ResponseEntity<InputStreamResource> downloadFile(String file) throws Exception {
+    public ResponseEntity<InputStreamResource> downloadFile(@PathVariable("id") String file) throws Exception {
         Optional<OSSObject> download = objectStorageService.download(file).blockOptional();
         if (download.isEmpty()) {
             throw new Exception("file not found");
@@ -116,18 +119,38 @@ public class Api implements ApiDoc {
                 .body(resource);
     }
 
-    @PostMapping(value = "/converts", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/pdfs/converts", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Override
     public ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception {
         if (file.isEmpty()) {
             throw new Exception("file is empty");
         }
 
-        Flux<DataBuffer> convert = pdfDocumentConverter.convert(file, null);
+        Flux<DataBuffer> convert = pdfDocumentConverter.convert(file.getInputStream(), file.getOriginalFilename(), file.getSize(), null);
         DataBufferUtils.write(convert, Path.of("E:/1.pdf"),
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE).block();
         return ApiBody.success();
     }
+
+    @PostMapping(value = "/files/callback")
+    @Override
+    public ApiBody<String> callBack(@RequestBody CallbackDTO dto) throws Exception {
+        TaskInfo taskInfo = new TaskInfo();
+        switch (dto.getStatus()) {
+            case 1, 2 -> {
+                // TODO: 发送转换消息
+            }
+            case 3, 4 -> {
+                // TODO: 发送切片消息
+            }
+            default -> {
+                throw new Exception("callback status error");
+            }
+        }
+        return ApiBody.success();
+    }
+
+
 }

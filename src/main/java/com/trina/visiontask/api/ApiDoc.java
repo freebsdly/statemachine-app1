@@ -8,8 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Vision Task API")
-public interface ApiDoc
-{
+public interface ApiDoc {
 
     @Operation(description = "File Processing")
     public ApiBody<String> processFile(TaskInfo info) throws Exception;
@@ -22,4 +21,7 @@ public interface ApiDoc
 
     @Operation(description = "Convert File to PDF")
     public ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception;
+
+    @Operation(description = "Callback")
+    public ApiBody<String> callBack(CallbackDTO dto) throws Exception;
 }

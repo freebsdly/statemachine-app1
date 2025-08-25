@@ -9,17 +9,16 @@ import java.util.UUID;
 
 @Data
 @NoArgsConstructor
-public class TaskInfo implements Serializable
-{
+public class TaskInfo implements Serializable {
     private UUID id;
     private String taskType;
 
     private int retryCount;
     private int priority;
-    private LocalDateTime processTime;
-    private LocalDateTime finishedTime;
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
     private String message;
-    private FileProcessingState prevState;
+    private FileProcessingState previousState;
     private FileProcessingState currentState;
     private FileProcessingEvent event;
     private FileInfo fileInfo;

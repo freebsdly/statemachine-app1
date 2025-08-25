@@ -21,7 +21,7 @@ public class FileUploadConsumer {
 
     @RabbitListener(id = "upload.consumer", queues = "${upload.consumer.queue-name}")
     public void consumeMessage(Channel channel, TaskInfo taskInfo, Message message) throws Exception {
-        log.info("Received upload message: {}", taskInfo);
+        log.debug("Received upload message: {}", taskInfo);
         try {
             // 处理消息的业务逻辑
             processMessage(taskInfo);

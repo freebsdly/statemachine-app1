@@ -14,22 +14,17 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
-public class FileUploadAction implements Action<FileProcessingState, FileProcessingEvent>
+public class AiSliceSubmitAction implements Action<FileProcessingState, FileProcessingEvent>
 {
 
-    private final ObjectStorageService objectStorageService;
-    private final MessageProducer messageProducer;
     private final String taskInfoKey;
     private final long timeout;
 
-    public FileUploadAction(
-            ObjectStorageService objectStorageService,
-            MessageProducer messageProducer,
+    public AiSliceSubmitAction(
             @Qualifier("taskInfoKey") String taskInfoKey,
-            @Qualifier("uploadTaskTimeout") long timeout)
+            @Qualifier("aiSliceTaskTimeout") long timeout
+                        )
     {
-        this.objectStorageService = objectStorageService;
-        this.messageProducer = messageProducer;
         this.taskInfoKey = taskInfoKey;
         this.timeout = timeout;
     }
@@ -41,38 +36,33 @@ public class FileUploadAction implements Action<FileProcessingState, FileProcess
             Message<FileProcessingEvent> message;
             TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
             try {
-                taskInfo = uploadFile(taskInfo);
+                submitAiSliceRequest(taskInfo);
                 message = MessageBuilder
-                        .withPayload(FileProcessingEvent.UPLOAD_SUCCESS)
+                        .withPayload(FileProcessingEvent.AI_SLICE_SUCCESS)
                         .setHeader(taskInfoKey, taskInfo)
                         .build();
             } catch (Exception e) {
                 if (taskInfo != null) {
                     taskInfo.setMessage(e.getMessage());
                 }
-                message = MessageBuilder.withPayload(FileProcessingEvent.UPLOAD_FAILURE)
-                        .setHeader("error", "upload file failed")
-                        .setHeader(taskInfoKey, taskInfo)
+                message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
+                        .setHeader("error", "process ai slice failed")
                         .build();
-
             }
-            context.getStateMachine().sendEvent(Mono.just(message))
-                    .blockLast();
+            context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
         }).orTimeout(timeout, TimeUnit.SECONDS);
+        ;
     }
 
-    // 这里只处理从网络存储获取文件并上传到对象存储的逻辑
-    private TaskInfo uploadFile(TaskInfo taskInfo) throws Exception
+    private void submitAiSliceRequest(TaskInfo taskInfo) throws Exception
     {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             throw new Exception("file info is null");
         }
-        // TODO: 实现文件上传逻辑
         FileInfo fileInfo = taskInfo.getFileInfo();
-        log.info("start uploading file {}", fileInfo.getFileName());
-
-        log.info("upload file {} finished", fileInfo.getFileName());
-        messageProducer.sendToPdfConvertQueue(taskInfo);
-        return taskInfo;
+        log.info("processing ai slice: {}", fileInfo.getFileName());
+        Thread.sleep(4000); // 模拟上传耗时
+        log.info("ai slice {} finished", fileInfo.getFileName());
     }
 }
+

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -21,42 +22,43 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
-public class PdfConvertAction implements Action<FileProcessingState, FileProcessingEvent>
-{
+public class PdfConvertAction implements Action<FileProcessingState, FileProcessingEvent> {
 
     private final ObjectStorageService objectStorageService;
     private final DocumentConverter documentConverter;
     private final MessageProducer messageProducer;
     private final String taskInfoKey;
+    private final long timeout;
 
     public PdfConvertAction(
             @Qualifier("PDFDocumentConverter") DocumentConverter documentConverter,
             ObjectStorageService objectStorageService,
             MessageProducer messageProducer,
-            @Qualifier("taskInfoKey") String taskInfoKey
-                           )
-    {
+            @Qualifier("taskInfoKey") String taskInfoKey,
+            @Qualifier("pdfConvertTaskTimeout") long timeout
+    ) {
         this.documentConverter = documentConverter;
         this.objectStorageService = objectStorageService;
         this.messageProducer = messageProducer;
         this.taskInfoKey = taskInfoKey;
+        this.timeout = timeout;
     }
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
-    {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
-            log.info("start converting pdf");
             Message<FileProcessingEvent> message;
             TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
             try {
-                taskInfo = convertToPdf(taskInfo);
+                convertToPdf(taskInfo);
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.PDF_CONVERT_SUCCESS)
                         .setHeader(taskInfoKey, taskInfo)
                         .build();
             } catch (Exception e) {
-                taskInfo.setMessage(e.getMessage());
+                if (taskInfo != null) {
+                    taskInfo.setMessage(e.getMessage());
+                }
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.PDF_CONVERT_FAILURE)
                         .setHeader("error", e.getMessage())
@@ -65,16 +67,16 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
 
             }
             context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
-        }).orTimeout(300, TimeUnit.SECONDS);
+        }).orTimeout(timeout, TimeUnit.SECONDS);
         ;
     }
 
-    private TaskInfo convertToPdf(TaskInfo taskInfo) throws Exception
-    {
+    private void convertToPdf(TaskInfo taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
             throw new Exception("file info is null");
         }
+        taskInfo.setStartTime(LocalDateTime.now());
         FileInfo fileInfo = taskInfo.getFileInfo();
         log.info("converting pdf: {}", fileInfo.getFileName());
         Optional<OSSObject> download = objectStorageService.download(fileInfo.getOssFileKey()).blockOptional();
@@ -101,8 +103,8 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         fileInfo.setPdfPath(result.getLocation());
         log.info("convert pdf {} finished", fileInfo.getFileName());
         taskInfo.setFileInfo(fileInfo);
+        taskInfo.setEndTime(LocalDateTime.now());
         messageProducer.sendToMdConvertQueue(taskInfo);
-        return taskInfo;
     }
 }
 
