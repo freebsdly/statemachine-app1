@@ -27,7 +27,6 @@ import reactor.netty.http.client.HttpClient;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
-@EnableStateMachineFactory
 public class Config {
 
     @Bean

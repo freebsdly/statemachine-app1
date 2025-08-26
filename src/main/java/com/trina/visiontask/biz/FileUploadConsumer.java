@@ -7,6 +7,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "upload.consumer.enabled", havingValue = "true", matchIfMissing = false)
@@ -21,16 +23,15 @@ public class FileUploadConsumer {
 
     @RabbitListener(id = "upload.consumer", queues = "${upload.consumer.queue-name}")
     public void consumeMessage(Channel channel, TaskInfo taskInfo, Message message) throws Exception {
-        log.debug("Received upload message: {}", taskInfo);
+        log.info("=========> Received upload message");
         try {
             // 处理消息的业务逻辑
             processMessage(taskInfo);
-            channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         } catch (Exception e) {
             log.warn("consume upload message failed, {}", e.getMessage());
-            // 可以根据需要进行消息重试或死信队列处理
-            channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, true);
         }
+        channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+        log.info("<========= Finished processing upload message");
     }
 
     /**
@@ -39,6 +40,7 @@ public class FileUploadConsumer {
      * @param message 消息内容
      */
     private void processMessage(TaskInfo message) throws Exception {
+        message.setTaskType("upload");
         fileProcessingService.processFile(
                 FileProcessingState.INITIAL,
                 FileProcessingEvent.UPLOAD_START,

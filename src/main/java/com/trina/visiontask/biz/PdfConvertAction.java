@@ -26,20 +26,17 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
 
     private final ObjectStorageService objectStorageService;
     private final DocumentConverter documentConverter;
-    private final MessageProducer messageProducer;
     private final String taskInfoKey;
     private final long timeout;
 
     public PdfConvertAction(
             @Qualifier("PDFDocumentConverter") DocumentConverter documentConverter,
             ObjectStorageService objectStorageService,
-            MessageProducer messageProducer,
             @Qualifier("taskInfoKey") String taskInfoKey,
             @Qualifier("pdfConvertTaskTimeout") long timeout
     ) {
         this.documentConverter = documentConverter;
         this.objectStorageService = objectStorageService;
-        this.messageProducer = messageProducer;
         this.taskInfoKey = taskInfoKey;
         this.timeout = timeout;
     }
@@ -66,12 +63,12 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
                         .build();
 
             }
-            context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
+            context.getStateMachine().sendEvent(Mono.just(message)).subscribe();
         }).orTimeout(timeout, TimeUnit.SECONDS);
         ;
     }
 
-    private void convertToPdf(TaskInfo taskInfo) throws Exception {
+    public void convertToPdf(TaskInfo taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
             throw new Exception("file info is null");
@@ -101,10 +98,9 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         CompleteMultipartUploadResult result = uploadResult.get();
         fileInfo.setOssPDFKey(result.getKey());
         fileInfo.setPdfPath(result.getLocation());
-        log.info("convert pdf {} finished", fileInfo.getFileName());
         taskInfo.setFileInfo(fileInfo);
         taskInfo.setEndTime(LocalDateTime.now());
-        messageProducer.sendToMdConvertQueue(taskInfo);
+        log.info("convert pdf {} finished", fileInfo.getFileName());
     }
 }
 

@@ -9,39 +9,31 @@ import org.springframework.statemachine.action.Action;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
-public class FileUploadAction implements Action<FileProcessingState, FileProcessingEvent>
-{
+public class FileUploadAction implements Action<FileProcessingState, FileProcessingEvent> {
 
-    private final ObjectStorageService objectStorageService;
-    private final MessageProducer messageProducer;
     private final String taskInfoKey;
     private final long timeout;
 
     public FileUploadAction(
-            ObjectStorageService objectStorageService,
-            MessageProducer messageProducer,
             @Qualifier("taskInfoKey") String taskInfoKey,
-            @Qualifier("uploadTaskTimeout") long timeout)
-    {
-        this.objectStorageService = objectStorageService;
-        this.messageProducer = messageProducer;
+            @Qualifier("uploadTaskTimeout") long timeout) {
         this.taskInfoKey = taskInfoKey;
         this.timeout = timeout;
     }
 
     @Override
-    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context)
-    {
+    public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
             TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
             try {
-                taskInfo = uploadFile(taskInfo);
+                uploadFile(taskInfo);
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.UPLOAD_SUCCESS)
                         .setHeader(taskInfoKey, taskInfo)
@@ -56,23 +48,22 @@ public class FileUploadAction implements Action<FileProcessingState, FileProcess
                         .build();
 
             }
-            context.getStateMachine().sendEvent(Mono.just(message))
-                    .blockLast();
+            context.getStateMachine().sendEvent(Mono.just(message)).subscribe();
         }).orTimeout(timeout, TimeUnit.SECONDS);
     }
 
     // 这里只处理从网络存储获取文件并上传到对象存储的逻辑
-    private TaskInfo uploadFile(TaskInfo taskInfo) throws Exception
-    {
+    private void uploadFile(TaskInfo taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             throw new Exception("file info is null");
         }
         // TODO: 实现文件上传逻辑
         FileInfo fileInfo = taskInfo.getFileInfo();
+        taskInfo.setStartTime(LocalDateTime.now());
         log.info("start uploading file {}", fileInfo.getFileName());
-
+        // 增加延时让状态转换完成
+        Thread.sleep(500);
+        taskInfo.setEndTime(LocalDateTime.now());
         log.info("upload file {} finished", fileInfo.getFileName());
-        messageProducer.sendToPdfConvertQueue(taskInfo);
-        return taskInfo;
     }
 }

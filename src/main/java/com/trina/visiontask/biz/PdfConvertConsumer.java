@@ -7,6 +7,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "pdf-convert.consumer.enabled", havingValue = "true", matchIfMissing = false)
@@ -20,16 +22,15 @@ public class PdfConvertConsumer {
 
     @RabbitListener(id = "pdf-convert.consumer", queues = "${pdf-convert.consumer.queue-name}")
     public void consumeMessage(Channel channel, TaskInfo taskInfo, Message message) throws Exception {
-        log.info("received pdf convert message: {}", taskInfo);
+        log.info("========> received pdf convert message");
         try {
             // 处理消息的业务逻辑
             processMessage(taskInfo);
-            channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         } catch (Exception e) {
             log.warn("consume pdf convert message failed, {}", e.getMessage());
-            // 可以根据需要进行消息重试或死信队列处理
-            channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, true);
         }
+        channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+        log.info("<======= Finished processing pdf convert message");
     }
 
     /**
@@ -38,6 +39,7 @@ public class PdfConvertConsumer {
      * @param message 消息内容
      */
     private void processMessage(TaskInfo message) throws Exception {
+        message.setTaskType("pdf-convert");
         fileProcessingService.processFile(
                 FileProcessingState.UPLOADED,
                 FileProcessingEvent.PDF_CONVERT_START,

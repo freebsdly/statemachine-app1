@@ -1,20 +1,24 @@
 package com.trina.visiontask.biz;
 
+import com.aliyun.oss.model.CompleteMultipartUploadResult;
+import com.trina.visiontask.repository.FileRepository;
+import com.trina.visiontask.repository.TaskRepository;
+import com.trina.visiontask.repository.entity.FileEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.config.StateMachineBuilder;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
-import org.springframework.statemachine.service.StateMachineService;
-import org.springframework.statemachine.transition.Transition;
+import org.springframework.statemachine.state.State;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.util.EnumSet;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -22,51 +26,99 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class FileProcessingService {
 
-    // 注入各个步骤的处理器
-    private final FileUploadAction fileUploadAction;
-
-    private final PdfConvertAction pdfConvertAction;
-
-    private final MdConvertSubmitAction mdConvertSubmitAction;
-
-    private final MdConvertCallbackAction mdConvertCallbackAction;
-
-    private final AiSliceSubmitAction aiSliceSubmitAction;
-
-    private final FailureAction failureAction;
-
+    private final FileRepository fileRepository;
+    private final TaskRepository taskRepository;
+    private final BizMapper bizMapper;
+    private final ObjectStorageService objectStorageService;
+    private final StateMachineManager stateMachineManager;
     private final MessageProducer messageProducer;
-
     private final String taskInfoKey;
-
     private final long waitTimeout;
 
     public FileProcessingService(
-            FileUploadAction fileUploadAction,
-            PdfConvertAction pdfConvertAction,
-            MdConvertSubmitAction mdConvertSubmitAction,
-            MdConvertCallbackAction mdConvertCallbackAction,
-            AiSliceSubmitAction aiSliceSubmitAction,
-            FailureAction failureAction,
+            FileRepository fileRepository,
+            TaskRepository taskRepository,
+            BizMapper bizMapper,
+            ObjectStorageService objectStorageService,
+            StateMachineManager stateMachineManager,
             MessageProducer messageProducer,
             @Qualifier("taskInfoKey") String taskInfoKey,
             @Qualifier("waitTimeout") long timeout
     ) {
-        this.fileUploadAction = fileUploadAction;
-        this.pdfConvertAction = pdfConvertAction;
-        this.mdConvertSubmitAction = mdConvertSubmitAction;
-        this.mdConvertCallbackAction = mdConvertCallbackAction;
-        this.aiSliceSubmitAction = aiSliceSubmitAction;
-        this.failureAction = failureAction;
+        this.fileRepository = fileRepository;
+        this.taskRepository = taskRepository;
+        this.bizMapper = bizMapper;
+        this.objectStorageService = objectStorageService;
+        this.stateMachineManager = stateMachineManager;
         this.messageProducer = messageProducer;
         this.taskInfoKey = taskInfoKey;
         this.waitTimeout = timeout;
     }
 
+    public TaskInfo uploadFile(MultipartFile file) throws Exception {
+        if (file.isEmpty()) {
+            throw new Exception("file is empty");
+        }
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isEmpty()) {
+            throw new Exception("file name is empty");
+        }
+
+        FileInfo fileInfo = new FileInfo();
+        Optional<FileEntity> exist = fileRepository.findByFileName(file.getOriginalFilename());
+        boolean shouldUpload = false;
+        if (exist.isPresent()) {
+            fileInfo = bizMapper.toDto(exist.get());
+            if (file.getSize() != fileInfo.getFileSize()) {
+                shouldUpload = true;
+            }
+        } else {
+            shouldUpload = true;
+            String suffix = null;
+            int i = originalFilename.lastIndexOf('.');
+            if (i > 0) {
+                suffix = originalFilename.substring(i + 1);
+            }
+
+            fileInfo.setFileId(UUID.randomUUID());
+            fileInfo.setFileName(originalFilename);
+            fileInfo.setMimeType(file.getContentType());
+            fileInfo.setFileType(suffix);
+        }
+
+        if (shouldUpload) {
+            String uploadName = String.format("%s.%s", fileInfo.getFileId(), fileInfo.getFileType());
+            Optional<CompleteMultipartUploadResult> result = objectStorageService.upload(uploadName, file.getInputStream()).blockOptional();
+            if (result.isEmpty()) {
+                log.error("upload file {} failed", fileInfo.getFileName());
+                throw new Exception("upload file failed");
+            }
+            CompleteMultipartUploadResult ossObject = result.get();
+            fileInfo.setOssFileKey(ossObject.getKey());
+            fileInfo.setFilePath(ossObject.getLocation());
+            fileInfo.setFileSize(file.getSize());
+        } else {
+            throw new Exception("file already exists and do not need to update");
+        }
+
+        // 构造TaskInfo对象
+        TaskInfo taskInfo = new TaskInfo();
+        taskInfo.setTaskId(UUID.randomUUID());
+        taskInfo.setFileInfo(fileInfo);
+        taskInfo.setStartTime(LocalDateTime.now());
+        taskInfo.setEndTime(LocalDateTime.now());
+
+        // 发送到处理队列, 文件已经上传这里设置初始状态发送给处理队列更新状态
+        taskInfo.setCurrentState(FileProcessingState.INITIAL);
+        taskInfo.setEvent(FileProcessingEvent.UPLOAD_START);
+        messageProducer.sendToUploadQueue(taskInfo);
+        return taskInfo;
+    }
+
     public void processFile(FileProcessingState initState, FileProcessingEvent event, TaskInfo taskInfo)
             throws Exception {
         // 这里使用builder创建状态机，以便从指定的初始状态开始，以便从指定的初始状态开始，例如文件已经上传，从UPLOADED状态开始，发送事件PDF_CONVERT_START事件，开始PDF转换
-        StateMachine<FileProcessingState, FileProcessingEvent> stateMachine = buildStateMachine(initState, taskInfo.getId().toString());
+        StateMachine<FileProcessingState, FileProcessingEvent> stateMachine = stateMachineManager.acquireStateMachine(initState, taskInfo.getTaskId().toString());
         CountDownLatch completionLatch = new CountDownLatch(1);
         if (taskInfo.getStartTime() == null) {
             taskInfo.setStartTime(LocalDateTime.now());
@@ -80,24 +132,29 @@ public class FileProcessingService {
             }
 
             @Override
-            public void transitionEnded(Transition<FileProcessingState, FileProcessingEvent> transition) {
-                FileProcessingState source = transition.getSource().getId();
-                FileProcessingState target = transition.getTarget().getId();
-                FileProcessingEvent event = transition.getTrigger().getEvent();
+            public void stateChanged(State<FileProcessingState, FileProcessingEvent> from, State<FileProcessingState, FileProcessingEvent> to) {
+                if (from == null) {
+                    // 初始化状态
+                    return;
+                }
+                FileProcessingState source = from.getId();
+                FileProcessingState target = to.getId();
+                FileProcessingEvent event = context.getEvent();
                 TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
-
+                log.info("State changed from {} to {}, triggered by {}", source, target, event);
                 if (taskInfo != null) {
                     taskInfo.setPreviousState(source);
                     taskInfo.setCurrentState(target);
                     taskInfo.setEvent(event);
-                    if (taskInfo.getEndTime() == null) {
-                        taskInfo.setEndTime(LocalDateTime.now());
-                    }
+                    taskInfo.setEndTime(LocalDateTime.now());
                 }
-                log.info("State changed from {} to {}, triggered by {}", source, target, event);
-                logTaskInfo(taskInfo);
-
-                // 检查是否到达最终状态
+                messageProducer.sendToTaskLogQueue(taskInfo);
+                switch (target) {
+                    case UPLOADED -> messageProducer.sendToPdfConvertQueue(taskInfo);
+                    case PDF_CONVERTED -> messageProducer.sendToMdConvertQueue(taskInfo);
+                    case MARKDOWN_CONVERTED -> messageProducer.sendToAiSliceQueue(taskInfo);
+                }
+                // 检查是否到达可退出状态
                 if (target == FileProcessingState.UPLOADED
                         || target == FileProcessingState.PDF_CONVERTED
                         || target == FileProcessingState.MARKDOWN_CONVERTED
@@ -111,150 +168,23 @@ public class FileProcessingService {
                     log.info("waiting for markdown or slice callback");
                 }
             }
-
-            private void logTaskInfo(TaskInfo taskInfo) {
-                log.info("TaskInfo: {}", taskInfo);
-                messageProducer.sendToTaskLogQueue(taskInfo);
-            }
         };
         stateMachine.addStateListener(listener);
+        stateMachine.startReactively().subscribe();
         Message<FileProcessingEvent> message = MessageBuilder.withPayload(event)
                 .setHeader(taskInfoKey, taskInfo)
                 .build();
         // 发送初始事件，开始文件处理流程
-        stateMachine.sendEvent(Mono.just(message)).blockLast();
+        stateMachine.sendEvent(Mono.just(message)).subscribe();
 
         // 等待处理完成
         boolean finished = completionLatch.await(waitTimeout, TimeUnit.SECONDS);
-        if (!finished) {
-            throw new Exception("state machine completion latch timeout");
+        if (finished) {
+            log.info("File processing finished");
+        } else {
+            log.warn("File processing timed out");
         }
-    }
-
-    private StateMachine<FileProcessingState, FileProcessingEvent> buildStateMachine(FileProcessingState initState, String id)
-            throws Exception {
-        StateMachineBuilder.Builder<FileProcessingState, FileProcessingEvent> builder = StateMachineBuilder.builder();
-        builder.configureStates()
-                .withStates()
-                .initial(initState)
-                .states(EnumSet.allOf(FileProcessingState.class))
-                .end(FileProcessingState.COMPLETED)
-                .end(FileProcessingState.FAILED);
-        builder
-                .configureTransitions()
-                .withExternal()
-                .source(FileProcessingState.INITIAL)
-                .target(FileProcessingState.UPLOADING)
-                .event(FileProcessingEvent.UPLOAD_START)
-                .action(fileUploadAction)
-                .and()
-                // 上传中 -> 上传完成
-                .withExternal()
-                .source(FileProcessingState.UPLOADING)
-                .target(FileProcessingState.UPLOADED)
-                .event(FileProcessingEvent.UPLOAD_SUCCESS)
-                .and()
-                // 上传中 -> 失败
-                .withExternal()
-                .source(FileProcessingState.UPLOADING)
-                .target(FileProcessingState.FAILED)
-                .event(FileProcessingEvent.UPLOAD_FAILURE)
-                .action(failureAction)
-                .and()
-                // 上传完成 -> PDF转换中
-                .withExternal()
-                .source(FileProcessingState.UPLOADED)
-                .target(FileProcessingState.PDF_CONVERTING)
-                .event(FileProcessingEvent.PDF_CONVERT_START)
-                .action(pdfConvertAction)
-                .and()
-                // PDF转换中 -> PDF转换完成
-                .withExternal()
-                .source(FileProcessingState.PDF_CONVERTING)
-                .target(FileProcessingState.PDF_CONVERTED)
-                .event(FileProcessingEvent.PDF_CONVERT_SUCCESS)
-                .and()
-                // PDF转换中 -> 失败
-                .withExternal()
-                .source(FileProcessingState.PDF_CONVERTING)
-                .target(FileProcessingState.FAILED)
-                .event(FileProcessingEvent.PDF_CONVERT_FAILURE)
-                .action(failureAction)
-                .and()
-                // PDF转换完成 -> Markdown转换提交中
-                .withExternal()
-                .source(FileProcessingState.PDF_CONVERTED)
-                .target(FileProcessingState.MARKDOWN_CONVERT_SUBMITTING)
-                .event(FileProcessingEvent.MD_CONVERT_START)
-                .action(mdConvertSubmitAction)
-                .and()
-                // Markdown转换提交中 -> Markdown转换已提交
-                .withExternal()
-                .source(FileProcessingState.MARKDOWN_CONVERT_SUBMITTING)
-                .target(FileProcessingState.MARKDOWN_CONVERT_SUBMITTED)
-                .event(FileProcessingEvent.MD_CONVERT_SUBMIT_SUCCESS)
-                .and()
-                // Markdown转换提交中 -> Markdown转换提交失败
-                .withExternal()
-                .source(FileProcessingState.MARKDOWN_CONVERT_SUBMITTING)
-                .target(FileProcessingState.FAILED)
-                .event(FileProcessingEvent.MD_CONVERT_SUBMIT_FAILURE)
-                .action(failureAction)
-                .and()
-                // Markdown转换已提交 -> Markdown转换完成
-                // 由Callback触发
-                .withExternal()
-                .source(FileProcessingState.MARKDOWN_CONVERT_SUBMITTED)
-                .target(FileProcessingState.MARKDOWN_CONVERTED)
-                .event(FileProcessingEvent.MD_CONVERT_SUCCESS)
-                .action(mdConvertCallbackAction)
-                .and()
-                // Markdown转换已提交 -> 失败
-                .withExternal()
-                .source(FileProcessingState.MARKDOWN_CONVERT_SUBMITTED)
-                .target(FileProcessingState.FAILED)
-                .event(FileProcessingEvent.MD_CONVERT_FAILURE)
-                .action(failureAction)
-                .and()
-                // Markdown转换完成 -> AI切片提交中
-                .withExternal()
-                .source(FileProcessingState.MARKDOWN_CONVERTED)
-                .target(FileProcessingState.AI_SLICE_SUBMITTING)
-                .event(FileProcessingEvent.AI_SLICE_START)
-                .action(aiSliceSubmitAction)
-                .and()
-                // AI切片请求提交中 -> AI切片请求已提交
-                .withExternal()
-                .source(FileProcessingState.AI_SLICE_SUBMITTING)
-                .target(FileProcessingState.AI_SLICE_SUBMITTED)
-                .event(FileProcessingEvent.AI_SLICE_SUBMIT_SUCCESS)
-                .and()
-                // AI切片请求提交中 -> 失败
-                .withExternal()
-                .source(FileProcessingState.AI_SLICE_SUBMITTING)
-                .target(FileProcessingState.FAILED)
-                .event(FileProcessingEvent.AI_SLICE_SUBMIT_FAILURE)
-                .action(failureAction)
-                .and()
-                // AI切片请求已提交 -> AI处理完成
-                // 由Callback触发
-                .withExternal()
-                .source(FileProcessingState.AI_SLICE_SUBMITTED)
-                .target(FileProcessingState.COMPLETED)
-                .event(FileProcessingEvent.AI_SLICE_SUCCESS)
-                .and()
-                // AI切片请求已提交 -> 失败
-                .withExternal()
-                .source(FileProcessingState.AI_SLICE_SUBMITTED)
-                .target(FileProcessingState.FAILED)
-                .event(FileProcessingEvent.AI_SLICE_FAILURE)
-                .action(failureAction);
-
-        builder.configureConfiguration()
-                .withConfiguration()
-                .machineId(id)
-                .autoStartup(true);
-
-        return builder.build();
+        stateMachineManager.releaseStateMachine(taskInfo.getTaskId().toString());
+        stateMachine.stopReactively().subscribe();
     }
 }
