@@ -7,6 +7,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "md-convert.consumer.enabled", havingValue = "true", matchIfMissing = false)
@@ -20,16 +22,15 @@ public class MarkdownConvertConsumer {
 
     @RabbitListener(id = "md-convert.consumer", queues = "${md-convert.consumer.queue-name}")
     public void consumeMessage(Channel channel, TaskInfo taskInfo, Message message) throws Exception {
-        log.info("received md convert message: {}", taskInfo);
+        log.info("=======> received md convert message");
         try {
             // 处理消息的业务逻辑
             processMessage(taskInfo);
-            channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         } catch (Exception e) {
-            long retryCount = message.getMessageProperties().getRetryCount();
             log.warn("consume md convert message failed, {}", e.getMessage());
-            channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, true);
         }
+        channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+        log.info("<======== finished process md convert message");
     }
 
     /**
@@ -38,6 +39,7 @@ public class MarkdownConvertConsumer {
      * @param message 消息内容
      */
     private void processMessage(TaskInfo message) throws Exception {
+        message.setTaskType("md-convert");
         fileProcessingService.processFile(
                 FileProcessingState.PDF_CONVERTED,
                 FileProcessingEvent.MD_CONVERT_START,

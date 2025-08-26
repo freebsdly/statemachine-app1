@@ -10,7 +10,8 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 public class FileInfo implements Serializable {
-    private UUID id;
+    private Long id;
+    private UUID FileId;
     private String fileName;
     private String fileType;
     private String mimeType;

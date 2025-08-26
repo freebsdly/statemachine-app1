@@ -1,6 +1,7 @@
 package com.trina.visiontask.biz;
 
 import com.trina.visiontask.converter.MarkdownDocumentConverter;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
@@ -53,11 +54,10 @@ public class MdConvertSubmitAction implements Action<FileProcessingState, FilePr
                         .setHeader(taskInfoKey, taskInfo)
                         .build();
             }
-            context.getStateMachine().sendEvent(Mono.just(message)).blockLast();
+            context.getStateMachine().sendEvent(Mono.just(message)).subscribe();
         }).orTimeout(timeout, TimeUnit.SECONDS);
     }
 
-    // TODO: 这里需要将异步回调接口转换为同步调用
     private void submitMarkdownConvertRequest(TaskInfo taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
@@ -70,10 +70,24 @@ public class MdConvertSubmitAction implements Action<FileProcessingState, FilePr
         options.setKey(fileInfo.getOssPDFKey());
         Optional<MarkDownConvertSubmittedDTO> result = markdownDocumentConverter.convert(
                 options, MarkDownConvertSubmittedDTO.class, null).blockOptional();
-        if (result.isEmpty()) {
+        if (result.isEmpty() || !result.get().success) {
             throw new Exception("submit md convert request failed");
         }
-        log.info("md {} convert request submitted", fileInfo.getFileName());
         taskInfo.setEndTime(LocalDateTime.now());
+        log.info("md {} convert request submitted", fileInfo.getFileName());
+    }
+
+    @Data
+    public static class MarkDownConvertSubmittedDTO {
+        private boolean success;
+        private String errMsg;
+        private String errCode;
+    }
+
+    @Data
+    public static class MarkdownConvertDTO {
+        private String itemId;
+        private String key;
+        private String envId;
     }
 }

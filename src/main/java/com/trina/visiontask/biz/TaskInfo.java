@@ -10,9 +10,9 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 public class TaskInfo implements Serializable {
-    private UUID id;
+    private Long id;
+    private UUID taskId;
     private String taskType;
-
     private int retryCount;
     private int priority;
     private LocalDateTime startTime;

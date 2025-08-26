@@ -32,14 +32,16 @@ public class Api implements ApiDoc {
     private final MessageProducer messageProducer;
     private final ObjectStorageService objectStorageService;
     private final DocumentConverter pdfDocumentConverter;
+    private final FileProcessingService fileProcessingService;
 
     public Api(MessageProducer messageProducer,
                ObjectStorageService objectStorageService,
-               @Qualifier("PDFDocumentConverter") DocumentConverter pdfDocumentConverter
-    ) {
+               @Qualifier("PDFDocumentConverter") DocumentConverter pdfDocumentConverter,
+               FileProcessingService fileProcessingService) {
         this.messageProducer = messageProducer;
         this.objectStorageService = objectStorageService;
         this.pdfDocumentConverter = pdfDocumentConverter;
+        this.fileProcessingService = fileProcessingService;
     }
 
 
@@ -54,41 +56,7 @@ public class Api implements ApiDoc {
     @Override
     @PostMapping(value = "/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiBody<TaskInfo> uploadFile(@RequestParam("file") MultipartFile file) throws Exception {
-        // 构造TaskInfo对象
-        TaskInfo taskInfo = new TaskInfo();
-        taskInfo.setId(UUID.randomUUID());
-        taskInfo.setStartTime(LocalDateTime.now());
-        String suffix = null;
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || originalFilename.isEmpty()) {
-            throw new Exception("file name is empty");
-        }
-        int i = originalFilename.lastIndexOf('.');
-        if (i > 0) {
-            suffix = originalFilename.substring(i + 1);
-        }
-        FileInfo fileInfo = new FileInfo();
-        fileInfo.setId(UUID.randomUUID());
-        fileInfo.setFileName(originalFilename);
-        fileInfo.setMimeType(file.getContentType());
-        fileInfo.setFileType(suffix);
-        String uploadName = String.format("%s.%s", fileInfo.getId(), fileInfo.getFileType());
-        Mono<CompleteMultipartUploadResult> upload = objectStorageService.upload(uploadName, file.getInputStream());
-        CompleteMultipartUploadResult result = upload.block();
-        if (result == null) {
-            log.error("upload file {} failed", fileInfo.getFileName());
-            throw new Exception("upload file failed");
-        }
-        fileInfo.setOssFileKey(result.getKey());
-        fileInfo.setFilePath(result.getLocation());
-        fileInfo.setFileSize(file.getSize());
-        taskInfo.setFileInfo(fileInfo);
-        taskInfo.setEndTime(LocalDateTime.now());
-
-        // 发送到处理队列, 文件已经上传这里设置初始状态发送给处理队列更新状态
-        taskInfo.setCurrentState(FileProcessingState.INITIAL);
-        taskInfo.setEvent(FileProcessingEvent.UPLOAD_START);
-        messageProducer.sendToUploadQueue(taskInfo);
+        TaskInfo taskInfo = fileProcessingService.uploadFile(file);
         return ApiBody.success(taskInfo);
 
     }
