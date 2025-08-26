@@ -35,6 +35,11 @@ public class Config {
     }
 
     @Bean
+    public int maxRetryCount() {
+        return 3;
+    }
+
+    @Bean
     public long waitTimeout() {
         return 30;
     }
