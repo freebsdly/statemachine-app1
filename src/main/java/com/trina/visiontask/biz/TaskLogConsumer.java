@@ -4,17 +4,19 @@ import com.trina.visiontask.repository.FileRepository;
 import com.trina.visiontask.repository.TaskRepository;
 import com.trina.visiontask.repository.entity.FileEntity;
 import com.trina.visiontask.repository.entity.TaskEntity;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-@Slf4j
+
 @Component
 @ConditionalOnProperty(name = "task-log.consumer.enabled", havingValue = "true", matchIfMissing = false)
 public class TaskLogConsumer {
+    private static final Logger log = LoggerFactory.getLogger(TaskLogConsumer.class);
     private final FileRepository fileRepository;
     private final TaskRepository taskRepository;
     private final BizMapper bizMapper;

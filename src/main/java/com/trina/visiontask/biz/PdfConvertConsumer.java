@@ -1,19 +1,17 @@
 package com.trina.visiontask.biz;
 
 import com.rabbitmq.client.Channel;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
-
-@Slf4j
 @Component
 @ConditionalOnProperty(name = "pdf-convert.consumer.enabled", havingValue = "true", matchIfMissing = false)
 public class PdfConvertConsumer {
-
+    private static final Logger log = LoggerFactory.getLogger(PdfConvertConsumer.class);
     private final FileProcessingService fileProcessingService;
 
     public PdfConvertConsumer(FileProcessingService fileProcessingService) {

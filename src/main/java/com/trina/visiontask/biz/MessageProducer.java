@@ -1,6 +1,8 @@
 package com.trina.visiontask.biz;
 
 import com.trina.visiontask.MQConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -8,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class MessageProducer {
-
+    private static final Logger log = LoggerFactory.getLogger(MessageProducer.class);
     private final RabbitTemplate rabbitTemplate;
     private final MQConfiguration uploadConfig;
     private final MQConfiguration pdfConvertConfig;

@@ -1,6 +1,5 @@
 package com.trina.visiontask.converter;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -14,7 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Set;
 
-@Slf4j
+
 @Component
 public class PDFDocumentConverter implements DocumentConverter {
 

@@ -2,7 +2,8 @@ package com.trina.visiontask.biz;
 
 import com.trina.visiontask.converter.MarkdownDocumentConverter;
 import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
@@ -16,9 +17,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Component
 public class MdConvertSubmitAction implements Action<FileProcessingState, FileProcessingEvent> {
+    private static final Logger log = LoggerFactory.getLogger(MdConvertSubmitAction.class);
     private final MarkdownDocumentConverter markdownDocumentConverter;
     private final String taskInfoKey;
     private final long timeout;

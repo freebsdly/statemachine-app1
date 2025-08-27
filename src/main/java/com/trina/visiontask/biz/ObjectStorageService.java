@@ -2,7 +2,8 @@ package com.trina.visiontask.biz;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.model.*;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
@@ -17,10 +18,10 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 
-@Slf4j
+
 @Service
 public class ObjectStorageService {
-
+    private static final Logger log = LoggerFactory.getLogger(ObjectStorageService.class);
     private final ObjectStorageOptions options;
     private final OSS ossClient;
     private final DataBufferFactory dataBufferFactory;

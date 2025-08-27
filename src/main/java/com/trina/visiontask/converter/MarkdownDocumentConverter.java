@@ -1,6 +1,5 @@
 package com.trina.visiontask.converter;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -9,7 +8,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Set;
 
-@Slf4j
+
 @Component
 @Qualifier("mdConverter")
 public class MarkdownDocumentConverter implements DocumentConverter {

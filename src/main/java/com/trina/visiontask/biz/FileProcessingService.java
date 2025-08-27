@@ -4,7 +4,8 @@ import com.aliyun.oss.model.CompleteMultipartUploadResult;
 import com.trina.visiontask.repository.FileRepository;
 import com.trina.visiontask.repository.TaskRepository;
 import com.trina.visiontask.repository.entity.FileEntity;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
@@ -22,9 +23,10 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Service
 public class FileProcessingService {
+
+    private static final Logger log = LoggerFactory.getLogger(FileProcessingService.class);
 
     private final FileRepository fileRepository;
     private final TaskRepository taskRepository;

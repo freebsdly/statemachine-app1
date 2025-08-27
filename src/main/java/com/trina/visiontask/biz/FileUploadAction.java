@@ -1,6 +1,7 @@
 package com.trina.visiontask.biz;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
@@ -13,9 +14,11 @@ import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
+
 @Component
 public class FileUploadAction implements Action<FileProcessingState, FileProcessingEvent> {
+
+    private static final Logger log = LoggerFactory.getLogger(FileUploadAction.class);
 
     private final String taskInfoKey;
     private final long timeout;

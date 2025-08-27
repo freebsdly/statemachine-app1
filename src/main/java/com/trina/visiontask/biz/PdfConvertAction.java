@@ -3,7 +3,8 @@ package com.trina.visiontask.biz;
 import com.aliyun.oss.model.CompleteMultipartUploadResult;
 import com.aliyun.oss.model.OSSObject;
 import com.trina.visiontask.converter.DocumentConverter;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.messaging.Message;
@@ -20,10 +21,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Component
 public class PdfConvertAction implements Action<FileProcessingState, FileProcessingEvent> {
-
+    private static final Logger log = LoggerFactory.getLogger(PdfConvertAction.class);
     private final ObjectStorageService objectStorageService;
     private final DocumentConverter documentConverter;
     private final String taskInfoKey;

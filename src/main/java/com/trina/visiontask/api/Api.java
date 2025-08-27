@@ -82,7 +82,7 @@ public class Api implements ApiDoc {
         // 返回响应实体
         return ResponseEntity.ok()
                 .headers(headers)
-                .contentLength(file.length())
+                .contentLength(ossObject.getObjectMetadata().getContentLength())
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
     }
