@@ -1,10 +1,13 @@
 package com.trina.visiontask.api;
 
-import com.aliyun.oss.model.CompleteMultipartUploadResult;
 import com.aliyun.oss.model.OSSObject;
-import com.trina.visiontask.biz.*;
 import com.trina.visiontask.converter.DocumentConverter;
-import lombok.extern.slf4j.Slf4j;
+import com.trina.visiontask.service.ObjectStorageService;
+import com.trina.visiontask.service.TaskDTO;
+import com.trina.visiontask.service.TaskService;
+import com.trina.visiontask.statemachine.TaskInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -15,53 +18,39 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.UUID;
 
-@Slf4j
 @RestController
+@RequestMapping("/api")
 public class Api implements ApiDoc {
+    private static final Logger log = LoggerFactory.getLogger(Api.class);
 
-    private final MessageProducer messageProducer;
     private final ObjectStorageService objectStorageService;
     private final DocumentConverter pdfDocumentConverter;
-    private final FileProcessingService fileProcessingService;
+    private final TaskService taskService;
 
-    public Api(MessageProducer messageProducer,
-               ObjectStorageService objectStorageService,
+    public Api(ObjectStorageService objectStorageService,
                @Qualifier("PDFDocumentConverter") DocumentConverter pdfDocumentConverter,
-               FileProcessingService fileProcessingService) {
-        this.messageProducer = messageProducer;
+               TaskService taskService) {
         this.objectStorageService = objectStorageService;
         this.pdfDocumentConverter = pdfDocumentConverter;
-        this.fileProcessingService = fileProcessingService;
-    }
-
-
-    @Override
-    @PostMapping("/process-file")
-    public ApiBody<String> processFile(@RequestBody TaskInfo info) throws Exception {
-        // TODO: 根据初始状态和事件判断发送到哪个处理队列
-        messageProducer.sendToUploadQueue(info);
-        return ApiBody.success();
+        this.taskService = taskService;
     }
 
     @Override
-    @PostMapping(value = "/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiBody<TaskInfo> uploadFile(@RequestParam("file") MultipartFile file) throws Exception {
-        TaskInfo taskInfo = fileProcessingService.uploadFile(file);
+    @PostMapping(value = "/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiBody<TaskDTO> uploadFile(@RequestParam("file") MultipartFile file) throws Exception {
+        TaskDTO taskInfo = taskService.uploadFile(file);
         return ApiBody.success(taskInfo);
 
     }
 
-    @GetMapping("/files/{id}")
+    @GetMapping("/files/download/{id}")
     @Override
     public ResponseEntity<InputStreamResource> downloadFile(@PathVariable("id") String file) throws Exception {
         Optional<OSSObject> download = objectStorageService.download(file).blockOptional();
@@ -87,7 +76,7 @@ public class Api implements ApiDoc {
                 .body(resource);
     }
 
-    @PostMapping(value = "/pdfs/converts", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/files/converts/pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Override
     public ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception {
         if (file.isEmpty()) {
@@ -102,7 +91,7 @@ public class Api implements ApiDoc {
         return ApiBody.success();
     }
 
-    @PostMapping(value = "/files/callback")
+    @PostMapping(value = "/files/converts/callback")
     @Override
     public ApiBody<String> callBack(@RequestBody CallbackDTO dto) throws Exception {
         TaskInfo taskInfo = new TaskInfo();
@@ -119,6 +108,4 @@ public class Api implements ApiDoc {
         }
         return ApiBody.success();
     }
-
-
 }

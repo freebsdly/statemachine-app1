@@ -11,4 +11,5 @@ public class ConverterOptions {
     private int readTimeout;
     private int writeTimeout;
     Map<String, String> headers;
+    private String envId;
 }

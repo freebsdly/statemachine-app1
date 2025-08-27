@@ -1,7 +1,10 @@
-package com.trina.visiontask.biz;
+package com.trina.visiontask.statemachine;
 
+import com.trina.visiontask.TaskConfiguration;
+import com.trina.visiontask.converter.AlgRequestDTO;
+import com.trina.visiontask.converter.AlgResponseDTO;
+import com.trina.visiontask.converter.ConverterOptions;
 import com.trina.visiontask.converter.MarkdownDocumentConverter;
-import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -21,29 +24,29 @@ import java.util.concurrent.TimeUnit;
 public class MdConvertSubmitAction implements Action<FileProcessingState, FileProcessingEvent> {
     private static final Logger log = LoggerFactory.getLogger(MdConvertSubmitAction.class);
     private final MarkdownDocumentConverter markdownDocumentConverter;
-    private final String taskInfoKey;
-    private final long timeout;
+    private final ConverterOptions converterOptions;
+    private final TaskConfiguration taskConfiguration;
 
     public MdConvertSubmitAction(
             @Qualifier("mdConverter") MarkdownDocumentConverter markdownDocumentConverter,
-            @Qualifier("taskInfoKey") String taskInfoKey,
-            @Qualifier("mdConvertTaskTimeout") long timeout
+            @Qualifier("mdConverterOptions") ConverterOptions converterOptions,
+            TaskConfiguration taskConfiguration
     ) {
         this.markdownDocumentConverter = markdownDocumentConverter;
-        this.taskInfoKey = taskInfoKey;
-        this.timeout = timeout;
+        this.converterOptions = converterOptions;
+        this.taskConfiguration = taskConfiguration;
     }
 
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
-            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
+            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
             try {
                 submitMarkdownConvertRequest(taskInfo);
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.MD_CONVERT_SUBMIT_SUCCESS)
-                        .setHeader(taskInfoKey, taskInfo)
+                        .setHeader(taskConfiguration.getTaskInfoKey(), taskInfo)
                         .build();
             } catch (Exception e) {
                 if (taskInfo != null) {
@@ -52,11 +55,11 @@ public class MdConvertSubmitAction implements Action<FileProcessingState, FilePr
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.MD_CONVERT_SUBMIT_FAILURE)
                         .setHeader("error", "submit convert markdown request failed")
-                        .setHeader(taskInfoKey, taskInfo)
+                        .setHeader(taskConfiguration.getTaskInfoKey(), taskInfo)
                         .build();
             }
             context.getStateMachine().sendEvent(Mono.just(message)).subscribe();
-        }).orTimeout(timeout, TimeUnit.SECONDS);
+        }).orTimeout(taskConfiguration.getMdConvertTaskTimeout(), TimeUnit.SECONDS);
     }
 
     private void submitMarkdownConvertRequest(TaskInfo taskInfo) throws Exception {
@@ -67,28 +70,14 @@ public class MdConvertSubmitAction implements Action<FileProcessingState, FilePr
         taskInfo.setStartTime(LocalDateTime.now());
         FileInfo fileInfo = taskInfo.getFileInfo();
         log.info("submitting md {} convert request", fileInfo.getFileName());
-        MarkdownConvertDTO options = new MarkdownConvertDTO();
-        options.setKey(fileInfo.getOssPDFKey());
-        Optional<MarkDownConvertSubmittedDTO> result = markdownDocumentConverter.convert(
-                options, MarkDownConvertSubmittedDTO.class, null).blockOptional();
-        if (result.isEmpty() || !result.get().success) {
+        AlgRequestDTO options = new AlgRequestDTO(fileInfo.getFileId().toString(), fileInfo.getOssPDFKey(),
+                null, converterOptions.getEnvId());
+        Optional<AlgResponseDTO> result = markdownDocumentConverter.convert(
+                options, AlgResponseDTO.class, null).blockOptional();
+        if (result.isEmpty() || !result.get().isSuccess()) {
             throw new Exception("submit md convert request failed");
         }
         taskInfo.setEndTime(LocalDateTime.now());
-        log.info("md {} convert request submitted", fileInfo.getFileName());
-    }
-
-    @Data
-    public static class MarkDownConvertSubmittedDTO {
-        private boolean success;
-        private String errMsg;
-        private String errCode;
-    }
-
-    @Data
-    public static class MarkdownConvertDTO {
-        private String itemId;
-        private String key;
-        private String envId;
+        log.info(" {} md convert request submitted", fileInfo.getFileName());
     }
 }

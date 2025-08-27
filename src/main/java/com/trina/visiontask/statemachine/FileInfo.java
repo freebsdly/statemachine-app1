@@ -1,4 +1,4 @@
-package com.trina.visiontask.biz;
+package com.trina.visiontask.statemachine;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;

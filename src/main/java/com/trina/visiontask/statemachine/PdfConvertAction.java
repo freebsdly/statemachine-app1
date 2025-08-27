@@ -1,7 +1,9 @@
-package com.trina.visiontask.biz;
+package com.trina.visiontask.statemachine;
 
 import com.aliyun.oss.model.CompleteMultipartUploadResult;
 import com.aliyun.oss.model.OSSObject;
+import com.trina.visiontask.TaskConfiguration;
+import com.trina.visiontask.service.ObjectStorageService;
 import com.trina.visiontask.converter.DocumentConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,31 +28,28 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
     private static final Logger log = LoggerFactory.getLogger(PdfConvertAction.class);
     private final ObjectStorageService objectStorageService;
     private final DocumentConverter documentConverter;
-    private final String taskInfoKey;
-    private final long timeout;
+    private final TaskConfiguration taskConfiguration;
 
     public PdfConvertAction(
             @Qualifier("PDFDocumentConverter") DocumentConverter documentConverter,
             ObjectStorageService objectStorageService,
-            @Qualifier("taskInfoKey") String taskInfoKey,
-            @Qualifier("pdfConvertTaskTimeout") long timeout
+            TaskConfiguration taskConfiguration
     ) {
         this.documentConverter = documentConverter;
         this.objectStorageService = objectStorageService;
-        this.taskInfoKey = taskInfoKey;
-        this.timeout = timeout;
+        this.taskConfiguration = taskConfiguration;
     }
 
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
-            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
+            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
             try {
                 convertToPdf(taskInfo);
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.PDF_CONVERT_SUCCESS)
-                        .setHeader(taskInfoKey, taskInfo)
+                        .setHeader(taskConfiguration.getTaskInfoKey(), taskInfo)
                         .build();
             } catch (Exception e) {
                 if (taskInfo != null) {
@@ -59,12 +58,12 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.PDF_CONVERT_FAILURE)
                         .setHeader("error", e.getMessage())
-                        .setHeader(taskInfoKey, taskInfo)
+                        .setHeader(taskConfiguration.getTaskInfoKey(), taskInfo)
                         .build();
 
             }
             context.getStateMachine().sendEvent(Mono.just(message)).subscribe();
-        }).orTimeout(timeout, TimeUnit.SECONDS);
+        }).orTimeout(taskConfiguration.getPdfConvertTaskTimeout(), TimeUnit.SECONDS);
         ;
     }
 

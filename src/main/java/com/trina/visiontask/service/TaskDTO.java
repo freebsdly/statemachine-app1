@@ -1,25 +1,18 @@
-package com.trina.visiontask.repository.entity;
+package com.trina.visiontask.service;
 
 import com.trina.visiontask.statemachine.FileProcessingEvent;
 import com.trina.visiontask.statemachine.FileProcessingState;
-import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Getter
-@Setter
-@Entity
-@Table(name = "task_infos", indexes = {
-        @Index(name = "task_infos_task_id_index", columnList = "task_id"),
-        @Index(name = "task_infos_file_id_index", columnList = "file_id")
-})
-public class TaskEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "id", nullable = false)
+/**
+ * DTO for {@link com.trina.visiontask.repository.entity.TaskEntity}
+ */
+@Data
+public class TaskDTO implements Serializable {
     private Long id;
     private UUID taskId;
     private String taskType;
@@ -31,10 +24,7 @@ public class TaskEntity {
     private FileProcessingState previousState;
     private FileProcessingState currentState;
     private FileProcessingEvent event;
-    @ManyToOne
-    @JoinColumn(name = "file_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
-    private FileEntity fileInfo;
-
+    private FileDTO fileInfo;
     private String mdCallbackUrl;
     private String sliceCallbackUrl;
 }

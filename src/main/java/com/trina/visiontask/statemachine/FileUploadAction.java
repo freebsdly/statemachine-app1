@@ -1,8 +1,8 @@
-package com.trina.visiontask.biz;
+package com.trina.visiontask.statemachine;
 
+import com.trina.visiontask.TaskConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateContext;
@@ -19,27 +19,22 @@ import java.util.concurrent.TimeUnit;
 public class FileUploadAction implements Action<FileProcessingState, FileProcessingEvent> {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadAction.class);
+    private final TaskConfiguration taskConfiguration;
 
-    private final String taskInfoKey;
-    private final long timeout;
-
-    public FileUploadAction(
-            @Qualifier("taskInfoKey") String taskInfoKey,
-            @Qualifier("uploadTaskTimeout") long timeout) {
-        this.taskInfoKey = taskInfoKey;
-        this.timeout = timeout;
+    public FileUploadAction(TaskConfiguration taskConfiguration) {
+        this.taskConfiguration = taskConfiguration;
     }
 
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
-            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
+            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
             try {
                 uploadFile(taskInfo);
                 message = MessageBuilder
                         .withPayload(FileProcessingEvent.UPLOAD_SUCCESS)
-                        .setHeader(taskInfoKey, taskInfo)
+                        .setHeader(taskConfiguration.getTaskInfoKey(), taskInfo)
                         .build();
             } catch (Exception e) {
                 if (taskInfo != null) {
@@ -47,12 +42,12 @@ public class FileUploadAction implements Action<FileProcessingState, FileProcess
                 }
                 message = MessageBuilder.withPayload(FileProcessingEvent.UPLOAD_FAILURE)
                         .setHeader("error", "upload file failed")
-                        .setHeader(taskInfoKey, taskInfo)
+                        .setHeader(taskConfiguration.getTaskInfoKey(), taskInfo)
                         .build();
 
             }
             context.getStateMachine().sendEvent(Mono.just(message)).subscribe();
-        }).orTimeout(timeout, TimeUnit.SECONDS);
+        }).orTimeout(taskConfiguration.getUploadTaskTimeout(), TimeUnit.SECONDS);
     }
 
     // 这里只处理从网络存储获取文件并上传到对象存储的逻辑

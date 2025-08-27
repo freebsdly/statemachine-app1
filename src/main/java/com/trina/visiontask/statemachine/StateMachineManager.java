@@ -1,4 +1,4 @@
-package com.trina.visiontask.biz;
+package com.trina.visiontask.statemachine;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +42,9 @@ public class StateMachineManager {
      * @return
      * @throws Exception
      */
-    public StateMachine<FileProcessingState, FileProcessingEvent> acquireStateMachine(FileProcessingState initState, String machineId) throws Exception {
+    public StateMachine<FileProcessingState, FileProcessingEvent> acquireStateMachine(
+            FileProcessingState initState, String machineId
+    ) throws Exception {
         StateMachine<FileProcessingState, FileProcessingEvent> stateMachine;
         // naive sync to handle concurrency with release
         synchronized (machines) {
@@ -82,7 +84,7 @@ public class StateMachineManager {
 
     private StateMachine<FileProcessingState, FileProcessingEvent> buildStateMachine(FileProcessingState initState, String id)
             throws Exception {
-        StateMachineBuilder.Builder<FileProcessingState, FileProcessingEvent> builder = StateMachineBuilder.builder();
+        var builder = StateMachineBuilder.<FileProcessingState, FileProcessingEvent>builder();
         builder.configureStates()
                 .withStates()
                 .initial(initState)

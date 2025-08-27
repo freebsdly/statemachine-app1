@@ -1,9 +1,11 @@
-package com.trina.visiontask.biz;
+package com.trina.visiontask.statemachine;
 
 
+import com.trina.visiontask.TaskConfiguration;
+import com.trina.visiontask.mq.MessageProducer;
+import com.trina.visiontask.service.TaskDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.action.Action;
 import org.springframework.stereotype.Component;
@@ -12,29 +14,26 @@ import org.springframework.stereotype.Component;
 public class FailureAction implements Action<FileProcessingState, FileProcessingEvent> {
     private static final Logger log = LoggerFactory.getLogger(FailureAction.class);
     private final MessageProducer messageProducer;
-    private final String taskInfoKey;
-    private final int maxRetryCount;
+    private final TaskConfiguration taskConfiguration;
 
     public FailureAction(
             MessageProducer messageProducer,
-            @Qualifier("taskInfoKey") String taskInfoKey,
-            @Qualifier("maxRetryCount") int maxRetryCount
+            TaskConfiguration taskConfiguration
     ) {
         this.messageProducer = messageProducer;
-        this.taskInfoKey = taskInfoKey;
-        this.maxRetryCount = maxRetryCount;
+        this.taskConfiguration = taskConfiguration;
     }
 
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
-        TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskInfoKey);
+        TaskDTO taskInfo = (TaskDTO) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
         if (taskInfo == null) {
             log.error("TaskInfo is null");
             return;
         }
 
         int retryCount = taskInfo.getRetryCount();
-        if (retryCount < maxRetryCount) {
+        if (retryCount < taskConfiguration.getMaxRetryCount()) {
             taskInfo.setRetryCount(retryCount + 1);
             taskInfo.setPriority(calculatePriority(taskInfo.getPriority()));
             taskInfo.setMessage(null);

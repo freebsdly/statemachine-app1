@@ -8,89 +8,45 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.annotation.EnableRetry;
 
 import java.util.Map;
 
 @Configuration
-public class RabbitMQConfig
-{
-
-    @Bean
-    @ConfigurationProperties(prefix = "upload.consumer")
-    public MQConfiguration uploadConfiguration()
-    {
-        return new MQConfiguration();
-    }
-
-    @Bean
-    @ConfigurationProperties(prefix = "pdf-convert.consumer")
-    public MQConfiguration pdfConvertConfiguration()
-    {
-        return new MQConfiguration();
-    }
-
-    @Bean
-    @ConfigurationProperties(prefix = "md-convert.consumer")
-    public MQConfiguration mdConvertConfiguration()
-    {
-        return new MQConfiguration();
-    }
-
-    @Bean
-    @ConfigurationProperties(prefix = "ai-slice.consumer")
-    public MQConfiguration aiSliceConfiguration()
-    {
-        return new MQConfiguration();
-    }
-
-    @Bean
-    @ConfigurationProperties(prefix = "task-log.consumer")
-    public MQConfiguration taskLogConfiguration()
-    {
-        return new MQConfiguration();
-    }
+public class RabbitMQConfig {
 
     // 为每个队列创建一个配置Bean，包含队列、交换机和绑定
     @Bean
-    public Declarables uploadQueueConfig(@Qualifier("uploadConfiguration") MQConfiguration mqConfig)
-    {
+    public Declarables uploadQueueConfig(@Qualifier("uploadConfiguration") MQConfiguration mqConfig) {
         Map<String, Object> args = Map.of("x-max-priority", mqConfig.getXMaxPriority());
         return getDeclarables(mqConfig, args);
     }
 
     @Bean
-    public Declarables pdfConvertQueueConfig(@Qualifier("pdfConvertConfiguration") MQConfiguration mqConfig)
-    {
+    public Declarables pdfConvertQueueConfig(@Qualifier("pdfConvertConfiguration") MQConfiguration mqConfig) {
         Map<String, Object> args = Map.of("x-max-priority", mqConfig.getXMaxPriority());
         return getDeclarables(mqConfig, args);
     }
 
     @Bean
-    public Declarables mdConvertQueueConfig(@Qualifier("mdConvertConfiguration") MQConfiguration mqConfig)
-    {
+    public Declarables mdConvertQueueConfig(@Qualifier("mdConvertConfiguration") MQConfiguration mqConfig) {
         Map<String, Object> args = Map.of("x-max-priority", mqConfig.getXMaxPriority());
         return getDeclarables(mqConfig, args);
     }
 
     @Bean
-    public Declarables aiSliceQueueConfig(@Qualifier("aiSliceConfiguration") MQConfiguration mqConfig)
-    {
+    public Declarables aiSliceQueueConfig(@Qualifier("aiSliceConfiguration") MQConfiguration mqConfig) {
         Map<String, Object> args = Map.of("x-max-priority", mqConfig.getXMaxPriority());
         return getDeclarables(mqConfig, args);
     }
 
     @Bean
-    public Declarables taskLogQueueConfig(@Qualifier("taskLogConfiguration") MQConfiguration mqConfig)
-    {
+    public Declarables taskLogQueueConfig(@Qualifier("taskLogConfiguration") MQConfiguration mqConfig) {
         return getDeclarables(mqConfig, Map.of());
     }
 
-    private Declarables getDeclarables(MQConfiguration mqConfig, Map<String, Object> args)
-    {
+    private Declarables getDeclarables(MQConfiguration mqConfig, Map<String, Object> args) {
         Queue queue = QueueBuilder.durable(mqConfig.getQueueName())
                 .withArguments(args)
                 .build();
@@ -104,15 +60,13 @@ public class RabbitMQConfig
     }
 
     @Bean
-    public MessageConverter jackson2JsonMessageConverter()
-    {
+    public MessageConverter jackson2JsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
     }
 
     @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory)
-    {
-        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+        var template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(jackson2JsonMessageConverter());
         return template;
     }
@@ -121,9 +75,8 @@ public class RabbitMQConfig
     public SimpleRabbitListenerContainerFactory taskLogContainerFactory(
             SimpleRabbitListenerContainerFactoryConfigurer configurer,
             ConnectionFactory connectionFactory,
-            @Qualifier("taskLogConfiguration") MQConfiguration mqConfig)
-    {
-        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+            @Qualifier("taskLogConfiguration") MQConfiguration mqConfig) {
+        var factory = new SimpleRabbitListenerContainerFactory();
         configurer.configure(factory, connectionFactory);
         factory.setMaxConcurrentConsumers(mqConfig.getMaxConcurrentConsumers());
         factory.setConcurrentConsumers(mqConfig.getConcurrentConsumers());

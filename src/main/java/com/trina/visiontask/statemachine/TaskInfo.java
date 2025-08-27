@@ -1,4 +1,4 @@
-package com.trina.visiontask.biz;
+package com.trina.visiontask.statemachine;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,4 +22,6 @@ public class TaskInfo implements Serializable {
     private FileProcessingState currentState;
     private FileProcessingEvent event;
     private FileInfo fileInfo;
+    private String mdCallbackUrl;
+    private String sliceCallbackUrl;
 }

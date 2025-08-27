@@ -1,6 +1,7 @@
-package com.trina.visiontask.biz;
+package com.trina.visiontask.mq;
 
 import com.trina.visiontask.MQConfiguration;
+import com.trina.visiontask.service.TaskDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
@@ -33,27 +34,27 @@ public class MessageProducer {
     }
 
 
-    public void sendToUploadQueue(TaskInfo info) throws AmqpException {
+    public void sendToUploadQueue(TaskDTO info) throws AmqpException {
         sendMessage(uploadConfig, info);
     }
 
-    public void sendToPdfConvertQueue(TaskInfo info) throws AmqpException {
+    public void sendToPdfConvertQueue(TaskDTO info) throws AmqpException {
         sendMessage(pdfConvertConfig, info);
     }
 
-    public void sendToMdConvertQueue(TaskInfo info) throws AmqpException {
+    public void sendToMdConvertQueue(TaskDTO info) throws AmqpException {
         sendMessage(mdConvertConfig, info);
     }
 
-    public void sendToAiSliceQueue(TaskInfo info) throws AmqpException {
+    public void sendToAiSliceQueue(TaskDTO info) throws AmqpException {
         sendMessage(aiSliceConfig, info);
     }
 
-    public void sendToTaskLogQueue(TaskInfo info) throws AmqpException {
+    public void sendToTaskLogQueue(TaskDTO info) throws AmqpException {
         sendMessage(taskLogConfig, info);
     }
 
-    private void sendMessage(MQConfiguration config, TaskInfo info) throws AmqpException {
+    private void sendMessage(MQConfiguration config, TaskDTO info) throws AmqpException {
         rabbitTemplate.convertAndSend(config.getExchangeName(), config.getRoutingKey(), info, message -> {
             // 设置优先级属性
             message.getMessageProperties().setPriority(info.getPriority());

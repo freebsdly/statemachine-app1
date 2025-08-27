@@ -3,65 +3,36 @@ package com.trina.visiontask;
 import com.aliyun.oss.ClientBuilderConfiguration;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
-import com.trina.visiontask.biz.FileProcessingEvent;
-import com.trina.visiontask.biz.FileProcessingState;
-import com.trina.visiontask.biz.ObjectStorageOptions;
+import com.trina.visiontask.service.ObjectStorageOptions;
 import com.trina.visiontask.converter.ConverterOptions;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.statemachine.config.EnableStateMachineFactory;
-import org.springframework.statemachine.config.StateMachineFactory;
-import org.springframework.statemachine.service.DefaultStateMachineService;
-import org.springframework.statemachine.service.StateMachineService;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 @Configuration
 public class Config {
 
-    @Bean
-    public String taskInfoKey() {
-        return "task.info";
-    }
+    private static final Logger log = Logger.getLogger(Config.class.getName());
 
     @Bean
-    public int maxRetryCount() {
-        return 3;
-    }
-
-    @Bean
-    public long waitTimeout() {
-        return 30;
-    }
-
-    @Bean
-    public long uploadTaskTimeout() {
-        return 300;
-    }
-
-    @Bean
-    public long pdfConvertTaskTimeout() {
-        return 300;
-    }
-
-    @Bean
-    public long mdConvertTaskTimeout() {
-        return 300;
-    }
-
-    @Bean
-    public long aiSliceTaskTimeout() {
-        return 300;
+    @ConfigurationProperties(prefix = "task.common")
+    public TaskConfiguration taskConfiguration() {
+        return new TaskConfiguration();
     }
 
     @Bean
@@ -82,6 +53,35 @@ public class Config {
         return new ConverterOptions();
     }
 
+    @Bean
+    @ConfigurationProperties(prefix = "upload.consumer")
+    public MQConfiguration uploadConfiguration() {
+        return new MQConfiguration();
+    }
+
+    @Bean
+    @ConfigurationProperties(prefix = "pdf-convert.consumer")
+    public MQConfiguration pdfConvertConfiguration() {
+        return new MQConfiguration();
+    }
+
+    @Bean
+    @ConfigurationProperties(prefix = "md-convert.consumer")
+    public MQConfiguration mdConvertConfiguration() {
+        return new MQConfiguration();
+    }
+
+    @Bean
+    @ConfigurationProperties(prefix = "ai-slice.consumer")
+    public MQConfiguration aiSliceConfiguration() {
+        return new MQConfiguration();
+    }
+
+    @Bean
+    @ConfigurationProperties(prefix = "task-log.consumer")
+    public MQConfiguration taskLogConfiguration() {
+        return new MQConfiguration();
+    }
 
     @Bean
     public WebClient pdfConvertWebClient(@Qualifier("pdfConverterOptions") ConverterOptions options) {
@@ -99,7 +99,7 @@ public class Config {
     }
 
     private WebClient getWebClient(ConverterOptions options) {
-        HttpClient httpClient = HttpClient.create()
+        var httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, options.getConnectTimeout())
                 .doOnConnected(conn -> conn
                         .addHandlerLast(new ReadTimeoutHandler(options.getReadTimeout(), TimeUnit.MILLISECONDS))
@@ -142,5 +142,39 @@ public class Config {
     @Bean
     public DataBufferFactory dataBufferFactory() {
         return new DefaultDataBufferFactory();
+    }
+
+    private String getHostIp() {
+        try {
+            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+            while (networkInterfaces.hasMoreElements()) {
+                var networkInterface = networkInterfaces.nextElement();
+                if (networkInterface.isUp() && !networkInterface.isLoopback()) {
+                    var addresses = networkInterface.getInetAddresses();
+                    while (addresses.hasMoreElements()) {
+                        var address = addresses.nextElement();
+                        if (!address.isLoopbackAddress() && !address.getHostAddress().contains(":")) {
+                            return address.getHostAddress();
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warning("Failed to get preferred IP address.");
+
+        }
+        return "127.0.0.1";
+    }
+
+    @Bean
+    public String getMdCallbackUrl(@Value("${server.port}") int port) {
+        var ip = getHostIp();
+        return String.format("http://%s:%d/md-convert/callback", ip, port);
+    }
+
+    @Bean
+    public String getSliceCallbackUrl(@Value("${server.port}") int port) {
+        var ip = getHostIp();
+        return String.format("http://%s:%d/slice/callback", ip, port);
     }
 }
