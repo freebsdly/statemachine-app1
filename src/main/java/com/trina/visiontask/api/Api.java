@@ -27,7 +27,8 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
-public class Api implements ApiDoc {
+public class Api implements ApiDoc
+{
     private static final Logger log = LoggerFactory.getLogger(Api.class);
     private final FileProcessingService fileProcessingService;
     private final ObjectStorageService objectStorageService;
@@ -40,7 +41,8 @@ public class Api implements ApiDoc {
             ObjectStorageService objectStorageService,
             @Qualifier("PDFDocumentConverter") DocumentConverter pdfDocumentConverter,
             TaskService taskService,
-            ApiMapper apiMapper) {
+            ApiMapper apiMapper)
+    {
         this.fileProcessingService = fileProcessingService;
         this.objectStorageService = objectStorageService;
         this.pdfDocumentConverter = pdfDocumentConverter;
@@ -50,7 +52,9 @@ public class Api implements ApiDoc {
 
     @Override
     @PostMapping(value = "/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiBody<TaskDTO> uploadFile(@RequestParam("file") MultipartFile file, @RequestParam(value = "force") boolean force) throws Exception {
+    public ApiBody<TaskDTO> uploadFile(@RequestParam("file") MultipartFile file,
+                                       @RequestParam(value = "force") boolean force) throws Exception
+    {
         TaskDTO taskInfo = taskService.uploadFile(file, force);
         return ApiBody.success(taskInfo);
 
@@ -58,7 +62,8 @@ public class Api implements ApiDoc {
 
     @GetMapping("/files/download/{id}")
     @Override
-    public ResponseEntity<InputStreamResource> downloadFile(@PathVariable("id") String file) throws Exception {
+    public ResponseEntity<InputStreamResource> downloadFile(@PathVariable("id") String file) throws Exception
+    {
         Optional<OSSObject> download = objectStorageService.download(file).blockOptional();
         if (download.isEmpty()) {
             throw new Exception("file not found");
@@ -84,22 +89,28 @@ public class Api implements ApiDoc {
 
     @PostMapping(value = "/files/converts/pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Override
-    public ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception {
+    public ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception
+    {
         if (file.isEmpty()) {
             throw new Exception("file is empty");
         }
 
-        Flux<DataBuffer> convert = pdfDocumentConverter.convert(file.getInputStream(), file.getOriginalFilename(), file.getSize(), null);
+        Flux<DataBuffer> convert = pdfDocumentConverter.convert(
+                file.getInputStream(),
+                file.getOriginalFilename(),
+                file.getSize(),
+                null);
         DataBufferUtils.write(convert, Path.of("E:/1.pdf"),
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-                StandardOpenOption.WRITE).block();
+                              StandardOpenOption.CREATE,
+                              StandardOpenOption.TRUNCATE_EXISTING,
+                              StandardOpenOption.WRITE).block();
         return ApiBody.success();
     }
 
     @PostMapping(value = "/files/converts/callback")
     @Override
-    public ApiBody<Void> callBack(@RequestBody CallbackDTO dto) throws Exception {
+    public ApiBody<Void> callBack(@RequestBody CallbackDTO dto) throws Exception
+    {
         fileProcessingService.processCallback(apiMapper.to(dto));
         return ApiBody.success();
     }

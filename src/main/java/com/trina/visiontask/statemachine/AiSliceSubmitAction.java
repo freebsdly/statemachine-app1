@@ -9,6 +9,7 @@ import com.trina.visiontask.converter.ConverterOptions;
 import com.trina.visiontask.converter.DocumentConverter;
 import com.trina.visiontask.service.FileDTO;
 import com.trina.visiontask.service.TaskDTO;
+import io.micrometer.core.annotation.Timed;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
@@ -66,6 +67,7 @@ public class AiSliceSubmitAction implements Action<FileProcessingState, FileProc
         ;
     }
 
+    @Timed("ai-slice-submit")
     private void submitAiSliceRequest(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");

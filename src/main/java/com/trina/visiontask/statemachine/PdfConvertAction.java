@@ -9,6 +9,7 @@ import com.trina.visiontask.converter.DocumentConverter;
 import com.trina.visiontask.service.FileDTO;
 import com.trina.visiontask.service.ObjectStorageService;
 import com.trina.visiontask.service.TaskDTO;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -71,6 +72,7 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         ;
     }
 
+    @Timed("pdf_convert_time")
     public void convertToPdf(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");

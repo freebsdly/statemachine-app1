@@ -9,6 +9,7 @@ import com.trina.visiontask.converter.ConverterOptions;
 import com.trina.visiontask.converter.MarkdownDocumentConverter;
 import com.trina.visiontask.service.FileDTO;
 import com.trina.visiontask.service.TaskDTO;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -66,6 +67,7 @@ public class MdConvertSubmitAction implements Action<FileProcessingState, FilePr
         }).orTimeout(taskConfiguration.getMdConvertTaskTimeout(), TimeUnit.SECONDS);
     }
 
+    @Timed("md_convert_submit_time")
     private void submitMarkdownConvertRequest(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
