@@ -1,7 +1,7 @@
 package com.trina.visiontask.service;
 
-import com.trina.visiontask.statemachine.FileProcessingEvent;
-import com.trina.visiontask.statemachine.FileProcessingState;
+import com.trina.visiontask.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingState;
 import lombok.Data;
 
 import java.io.Serializable;

@@ -1,10 +1,14 @@
 package com.trina.visiontask.statemachine;
 
+import com.trina.visiontask.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingState;
 import com.trina.visiontask.TaskConfiguration;
 import com.trina.visiontask.converter.AlgRequestDTO;
 import com.trina.visiontask.converter.AlgResponseDTO;
 import com.trina.visiontask.converter.ConverterOptions;
 import com.trina.visiontask.converter.DocumentConverter;
+import com.trina.visiontask.service.FileDTO;
+import com.trina.visiontask.service.TaskDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
@@ -41,19 +45,20 @@ public class AiSliceSubmitAction implements Action<FileProcessingState, FileProc
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
-            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
+            TaskDTO taskInfo = (TaskDTO) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
             try {
                 submitAiSliceRequest(taskInfo);
                 message = MessageBuilder
-                        .withPayload(FileProcessingEvent.AI_SLICE_SUCCESS)
+                        .withPayload(FileProcessingEvent.AI_SLICE_SUBMIT_SUCCESS)
                         .setHeader(taskConfiguration.getTaskInfoKey(), taskInfo)
                         .build();
             } catch (Exception e) {
                 if (taskInfo != null) {
                     taskInfo.setMessage(e.getMessage());
                 }
-                message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_FAILURE)
+                message = MessageBuilder.withPayload(FileProcessingEvent.AI_SLICE_SUBMIT_FAILURE)
                         .setHeader("error", "process ai slice failed")
+                        .setHeader(taskConfiguration.getTaskInfoKey(), taskInfo)
                         .build();
             }
             context.getStateMachine().sendEvent(Mono.just(message)).subscribe();
@@ -61,13 +66,13 @@ public class AiSliceSubmitAction implements Action<FileProcessingState, FileProc
         ;
     }
 
-    private void submitAiSliceRequest(TaskInfo taskInfo) throws Exception {
+    private void submitAiSliceRequest(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
             throw new Exception("file info is null");
         }
         taskInfo.setStartTime(LocalDateTime.now());
-        FileInfo fileInfo = taskInfo.getFileInfo();
+        FileDTO fileInfo = taskInfo.getFileInfo();
         log.info("submitting ai slice request, {}", fileInfo.getFileName());
         AlgRequestDTO options = new AlgRequestDTO(fileInfo.getFileId().toString(), fileInfo.getOssMDKey(),
                 System.currentTimeMillis(), converterOptions.getEnvId());

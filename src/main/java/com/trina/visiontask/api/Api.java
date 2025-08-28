@@ -5,7 +5,7 @@ import com.trina.visiontask.converter.DocumentConverter;
 import com.trina.visiontask.service.ObjectStorageService;
 import com.trina.visiontask.service.TaskDTO;
 import com.trina.visiontask.service.TaskService;
-import com.trina.visiontask.statemachine.TaskInfo;
+import com.trina.visiontask.statemachine.FileProcessingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -29,23 +29,29 @@ import java.util.Optional;
 @RequestMapping("/api")
 public class Api implements ApiDoc {
     private static final Logger log = LoggerFactory.getLogger(Api.class);
-
+    private final FileProcessingService fileProcessingService;
     private final ObjectStorageService objectStorageService;
     private final DocumentConverter pdfDocumentConverter;
     private final TaskService taskService;
+    private final ApiMapper apiMapper;
 
-    public Api(ObjectStorageService objectStorageService,
-               @Qualifier("PDFDocumentConverter") DocumentConverter pdfDocumentConverter,
-               TaskService taskService) {
+    public Api(
+            FileProcessingService fileProcessingService,
+            ObjectStorageService objectStorageService,
+            @Qualifier("PDFDocumentConverter") DocumentConverter pdfDocumentConverter,
+            TaskService taskService,
+            ApiMapper apiMapper) {
+        this.fileProcessingService = fileProcessingService;
         this.objectStorageService = objectStorageService;
         this.pdfDocumentConverter = pdfDocumentConverter;
         this.taskService = taskService;
+        this.apiMapper = apiMapper;
     }
 
     @Override
     @PostMapping(value = "/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiBody<TaskDTO> uploadFile(@RequestParam("file") MultipartFile file) throws Exception {
-        TaskDTO taskInfo = taskService.uploadFile(file);
+    public ApiBody<TaskDTO> uploadFile(@RequestParam("file") MultipartFile file, @RequestParam(value = "force") boolean force) throws Exception {
+        TaskDTO taskInfo = taskService.uploadFile(file, force);
         return ApiBody.success(taskInfo);
 
     }
@@ -93,19 +99,8 @@ public class Api implements ApiDoc {
 
     @PostMapping(value = "/files/converts/callback")
     @Override
-    public ApiBody<String> callBack(@RequestBody CallbackDTO dto) throws Exception {
-        TaskInfo taskInfo = new TaskInfo();
-        switch (dto.getStatus()) {
-            case 1, 2 -> {
-                // TODO: 发送转换消息
-            }
-            case 3, 4 -> {
-                // TODO: 发送切片消息
-            }
-            default -> {
-                throw new Exception("callback status error");
-            }
-        }
+    public ApiBody<Void> callBack(@RequestBody CallbackDTO dto) throws Exception {
+        fileProcessingService.processCallback(apiMapper.to(dto));
         return ApiBody.success();
     }
 }

@@ -39,6 +39,13 @@ public class AiSliceConverter implements DocumentConverter {
                 .uri(converterOptions.getUrl())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(dto)
-                .exchangeToMono(response -> response.bodyToMono(clazz));
+                .exchangeToMono(response -> {
+                    if (response.statusCode().is2xxSuccessful()) {
+                        return response.bodyToMono(clazz);
+                    } else {
+                        ConversionException ex = new ConversionException(String.format("Conversion failed. %s", response.statusCode()));
+                        return Mono.error(ex);
+                    }
+                });
     }
 }

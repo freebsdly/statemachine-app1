@@ -2,9 +2,9 @@ package com.trina.visiontask.mq;
 
 import com.rabbitmq.client.Channel;
 import com.trina.visiontask.service.TaskDTO;
-import com.trina.visiontask.statemachine.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingEvent;
 import com.trina.visiontask.statemachine.FileProcessingService;
-import com.trina.visiontask.statemachine.FileProcessingState;
+import com.trina.visiontask.FileProcessingState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
@@ -24,7 +24,7 @@ public class PdfConvertConsumer {
 
     @RabbitListener(id = "pdf-convert.consumer", queues = "${pdf-convert.consumer.queue-name}")
     public void consumeMessage(Channel channel, TaskDTO taskInfo, Message message) throws Exception {
-        log.info("========> received pdf convert message");
+        log.debug("========> received pdf convert message");
         try {
             // 处理消息的业务逻辑
             processMessage(taskInfo);
@@ -32,7 +32,7 @@ public class PdfConvertConsumer {
             log.warn("consume pdf convert message failed, {}", e.getMessage());
         }
         channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
-        log.info("<======= Finished processing pdf convert message");
+        log.debug("<======= Finished processing pdf convert message");
     }
 
     /**

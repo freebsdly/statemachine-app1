@@ -21,7 +21,11 @@ public class TaskLogConsumer {
 
     @RabbitListener(id = "task-log.consumer", queues = "${task-log.consumer.queue-name}", containerFactory = "taskLogContainerFactory")
     public void consumeMessage(TaskDTO taskInfo) throws Exception {
-        log.info("received task log message: {}", taskInfo);
-        taskService.saveTask(taskInfo);
+        log.debug("received task log message: {}", taskInfo);
+        try {
+            taskService.saveOrUpdateTask(taskInfo);
+        } catch (Exception e) {
+            log.error("save task log failed", e);
+        }
     }
 }

@@ -3,8 +3,8 @@ package com.trina.visiontask;
 import com.aliyun.oss.ClientBuilderConfiguration;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
-import com.trina.visiontask.service.ObjectStorageOptions;
 import com.trina.visiontask.converter.ConverterOptions;
+import com.trina.visiontask.service.ObjectStorageOptions;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
@@ -98,6 +98,11 @@ public class Config {
         return getWebClient(options);
     }
 
+    @Bean
+    public WebClient getCallbackWebClient(@Qualifier("mdConverterOptions") ConverterOptions options) {
+        return getWebClient(options);
+    }
+
     private WebClient getWebClient(ConverterOptions options) {
         var httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, options.getConnectTimeout())
@@ -169,12 +174,12 @@ public class Config {
     @Bean
     public String getMdCallbackUrl(@Value("${server.port}") int port) {
         var ip = getHostIp();
-        return String.format("http://%s:%d/md-convert/callback", ip, port);
+        return String.format("http://%s:%d/api/files/converts/callback", ip, port);
     }
 
     @Bean
     public String getSliceCallbackUrl(@Value("${server.port}") int port) {
         var ip = getHostIp();
-        return String.format("http://%s:%d/slice/callback", ip, port);
+        return String.format("http://%s:%d/api/files/converts/callback", ip, port);
     }
 }

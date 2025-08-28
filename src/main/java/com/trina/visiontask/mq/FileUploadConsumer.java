@@ -2,9 +2,9 @@ package com.trina.visiontask.mq;
 
 import com.rabbitmq.client.Channel;
 import com.trina.visiontask.service.TaskDTO;
-import com.trina.visiontask.statemachine.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingEvent;
 import com.trina.visiontask.statemachine.FileProcessingService;
-import com.trina.visiontask.statemachine.FileProcessingState;
+import com.trina.visiontask.FileProcessingState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
@@ -25,7 +25,7 @@ public class FileUploadConsumer {
 
     @RabbitListener(id = "upload.consumer", queues = "${upload.consumer.queue-name}")
     public void consumeMessage(Channel channel, TaskDTO taskInfo, Message message) throws Exception {
-        log.info("=========> Received upload message");
+        log.debug("=========> Received upload message");
         try {
             // 处理消息的业务逻辑
             processMessage(taskInfo);
@@ -33,7 +33,7 @@ public class FileUploadConsumer {
             log.warn("consume upload message failed, {}", e.getMessage());
         }
         channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
-        log.info("<========= Finished processing upload message");
+        log.debug("<========= Finished processing upload message");
     }
 
     /**

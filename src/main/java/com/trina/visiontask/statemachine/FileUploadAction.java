@@ -1,6 +1,10 @@
 package com.trina.visiontask.statemachine;
 
+import com.trina.visiontask.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingState;
 import com.trina.visiontask.TaskConfiguration;
+import com.trina.visiontask.service.FileDTO;
+import com.trina.visiontask.service.TaskDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.Message;
@@ -29,7 +33,7 @@ public class FileUploadAction implements Action<FileProcessingState, FileProcess
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
-            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
+            TaskDTO taskInfo = (TaskDTO) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
             try {
                 uploadFile(taskInfo);
                 message = MessageBuilder
@@ -51,12 +55,12 @@ public class FileUploadAction implements Action<FileProcessingState, FileProcess
     }
 
     // 这里只处理从网络存储获取文件并上传到对象存储的逻辑
-    private void uploadFile(TaskInfo taskInfo) throws Exception {
+    private void uploadFile(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             throw new Exception("file info is null");
         }
         // TODO: 实现文件上传逻辑
-        FileInfo fileInfo = taskInfo.getFileInfo();
+        FileDTO fileInfo = taskInfo.getFileInfo();
         taskInfo.setStartTime(LocalDateTime.now());
         log.info("start uploading file {}", fileInfo.getFileName());
         // 增加延时让状态转换完成

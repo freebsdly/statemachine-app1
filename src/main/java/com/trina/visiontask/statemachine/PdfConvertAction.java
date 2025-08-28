@@ -2,9 +2,13 @@ package com.trina.visiontask.statemachine;
 
 import com.aliyun.oss.model.CompleteMultipartUploadResult;
 import com.aliyun.oss.model.OSSObject;
+import com.trina.visiontask.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingState;
 import com.trina.visiontask.TaskConfiguration;
-import com.trina.visiontask.service.ObjectStorageService;
 import com.trina.visiontask.converter.DocumentConverter;
+import com.trina.visiontask.service.FileDTO;
+import com.trina.visiontask.service.ObjectStorageService;
+import com.trina.visiontask.service.TaskDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -44,7 +48,7 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         CompletableFuture.runAsync(() -> {
             Message<FileProcessingEvent> message;
-            TaskInfo taskInfo = (TaskInfo) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
+            TaskDTO taskInfo = (TaskDTO) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
             try {
                 convertToPdf(taskInfo);
                 message = MessageBuilder
@@ -67,13 +71,13 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         ;
     }
 
-    public void convertToPdf(TaskInfo taskInfo) throws Exception {
+    public void convertToPdf(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
             throw new Exception("file info is null");
         }
         taskInfo.setStartTime(LocalDateTime.now());
-        FileInfo fileInfo = taskInfo.getFileInfo();
+        FileDTO fileInfo = taskInfo.getFileInfo();
         log.info("converting pdf: {}", fileInfo.getFileName());
         Optional<OSSObject> download = objectStorageService.download(fileInfo.getOssFileKey()).blockOptional();
         if (download.isEmpty()) {
@@ -81,7 +85,11 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         }
         OSSObject ossObject = download.get();
         long contentLength = ossObject.getObjectMetadata().getContentLength();
+
         String uploadName = String.format("%s.%s", UUID.randomUUID(), "pdf");
+        if (fileInfo.getOssPDFKey() != null && !fileInfo.getOssPDFKey().isEmpty()) {
+            uploadName = fileInfo.getOssPDFKey();
+        }
         Flux<DataBuffer> convert = documentConverter.convert(
                 ossObject.getObjectContent(),
                 uploadName,

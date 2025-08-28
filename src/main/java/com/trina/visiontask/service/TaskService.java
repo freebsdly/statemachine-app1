@@ -1,13 +1,12 @@
 package com.trina.visiontask.service;
 
 import com.aliyun.oss.model.CompleteMultipartUploadResult;
-import com.trina.visiontask.mq.MessageProducer;
+import com.trina.visiontask.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingState;
 import com.trina.visiontask.repository.FileRepository;
 import com.trina.visiontask.repository.TaskRepository;
 import com.trina.visiontask.repository.entity.FileEntity;
 import com.trina.visiontask.repository.entity.TaskEntity;
-import com.trina.visiontask.statemachine.FileProcessingEvent;
-import com.trina.visiontask.statemachine.FileProcessingState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -88,7 +87,12 @@ public class TaskService {
         taskRepository.save(taskEntity);
     }
 
-    public TaskDTO uploadFile(MultipartFile file) throws Exception {
+    public TaskDTO getTask(UUID taskId) throws Exception {
+        TaskEntity task = taskRepository.findByTaskId(taskId).orElseThrow();
+        return dtoMapper.toDto(task);
+    }
+
+    public TaskDTO uploadFile(MultipartFile file, boolean force) throws Exception {
         if (file.isEmpty()) {
             throw new Exception("file is empty");
         }
@@ -100,6 +104,7 @@ public class TaskService {
         FileDTO fileInfo = new FileDTO();
         Optional<FileEntity> exist = fileRepository.findByFileName(file.getOriginalFilename());
         boolean shouldUpload = false;
+
         if (exist.isPresent()) {
             fileInfo = dtoMapper.toDto(exist.get());
             if (file.getSize() != fileInfo.getFileSize()) {
@@ -118,6 +123,12 @@ public class TaskService {
             fileInfo.setMimeType(file.getContentType());
             fileInfo.setFileType(suffix);
         }
+
+        if (force) {
+            log.debug("force to upload file {}", originalFilename);
+            shouldUpload = true;
+        }
+
 
         if (shouldUpload) {
             String uploadName = String.format("%s.%s", fileInfo.getFileId(), fileInfo.getFileType());

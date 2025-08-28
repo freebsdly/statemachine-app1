@@ -1,5 +1,7 @@
 package com.trina.visiontask.statemachine;
 
+import com.trina.visiontask.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.statemachine.StateMachine;
@@ -9,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Component
 public class StateMachineManager {
@@ -60,14 +63,14 @@ public class StateMachineManager {
         return stateMachine;
     }
 
-    public StateMachine<FileProcessingState, FileProcessingEvent> getStateMachine(String machineId) {
+    public Optional<StateMachine<FileProcessingState, FileProcessingEvent>> getStateMachine(String machineId) {
         StateMachine<FileProcessingState, FileProcessingEvent> stateMachine;
         // naive sync to handle concurrency with release
         synchronized (machines) {
             stateMachine = machines.get(machineId);
         }
 
-        return stateMachine;
+        return Optional.of(stateMachine);
     }
 
     /**

@@ -1,4 +1,4 @@
-package com.trina.visiontask.statemachine;
+package com.trina.visiontask;
 
 public enum FileProcessingEvent
 {

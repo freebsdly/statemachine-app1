@@ -1,7 +1,6 @@
-package com.trina.visiontask.mq;
+package com.trina.visiontask.service;
 
 import com.trina.visiontask.MQConfiguration;
-import com.trina.visiontask.service.TaskDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;

@@ -1,7 +1,7 @@
 package com.trina.visiontask.repository.entity;
 
-import com.trina.visiontask.statemachine.FileProcessingEvent;
-import com.trina.visiontask.statemachine.FileProcessingState;
+import com.trina.visiontask.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingState;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;

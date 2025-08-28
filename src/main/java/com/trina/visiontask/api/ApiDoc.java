@@ -12,7 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 public interface ApiDoc {
 
     @Operation(description = "Upload File")
-    ApiBody<TaskDTO> uploadFile(MultipartFile file) throws Exception;
+    ApiBody<TaskDTO> uploadFile(MultipartFile file, boolean force) throws Exception;
 
     @Operation(description = "Download File")
     ResponseEntity<InputStreamResource> downloadFile(String file) throws Exception;
@@ -21,5 +21,5 @@ public interface ApiDoc {
     ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception;
 
     @Operation(description = "Callback")
-    ApiBody<String> callBack(@RequestBody CallbackDTO dto) throws Exception;
+    ApiBody<Void> callBack(@RequestBody CallbackDTO dto) throws Exception;
 }

@@ -1,8 +1,10 @@
 package com.trina.visiontask.statemachine;
 
 
+import com.trina.visiontask.FileProcessingEvent;
+import com.trina.visiontask.FileProcessingState;
 import com.trina.visiontask.TaskConfiguration;
-import com.trina.visiontask.mq.MessageProducer;
+import com.trina.visiontask.service.MessageProducer;
 import com.trina.visiontask.service.TaskDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +30,7 @@ public class FailureAction implements Action<FileProcessingState, FileProcessing
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         TaskDTO taskInfo = (TaskDTO) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());
         if (taskInfo == null) {
-            log.error("TaskInfo is null");
+            log.error("taskInfo is null");
             return;
         }
 
@@ -45,8 +47,8 @@ public class FailureAction implements Action<FileProcessingState, FileProcessing
             switch (event) {
                 case UPLOAD_FAILURE -> messageProducer.sendToUploadQueue(taskInfo);
                 case PDF_CONVERT_FAILURE -> messageProducer.sendToPdfConvertQueue(taskInfo);
-                case MD_CONVERT_FAILURE -> messageProducer.sendToMdConvertQueue(taskInfo);
-                case AI_SLICE_FAILURE -> messageProducer.sendToAiSliceQueue(taskInfo);
+                case MD_CONVERT_SUBMIT_FAILURE, MD_CONVERT_FAILURE -> messageProducer.sendToMdConvertQueue(taskInfo);
+                case AI_SLICE_SUBMIT_FAILURE, AI_SLICE_FAILURE -> messageProducer.sendToAiSliceQueue(taskInfo);
                 default -> log.error("unknown event: {}", event);
             }
         }
