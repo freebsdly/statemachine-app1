@@ -12,4 +12,5 @@ public class AlgRequestDTO implements Serializable {
     private String key;
     private Long timestamp;
     private String envId;
+    private String tags;
 }

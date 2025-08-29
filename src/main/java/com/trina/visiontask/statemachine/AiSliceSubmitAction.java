@@ -67,7 +67,7 @@ public class AiSliceSubmitAction implements Action<FileProcessingState, FileProc
         ;
     }
 
-    @Timed("ai-slice-submit")
+    @Timed(value = "ai.slice.submit", description = "ai slice submit")
     private void submitAiSliceRequest(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
@@ -77,7 +77,7 @@ public class AiSliceSubmitAction implements Action<FileProcessingState, FileProc
         FileDTO fileInfo = taskInfo.getFileInfo();
         log.info("submitting ai slice request, {}", fileInfo.getFileName());
         AlgRequestDTO options = new AlgRequestDTO(fileInfo.getFileId().toString(), fileInfo.getOssMDKey(),
-                System.currentTimeMillis(), converterOptions.getEnvId());
+                System.currentTimeMillis(), converterOptions.getEnvId(), null);
         Optional<AlgResponseDTO> result = aiSliceConverter.convert(
                 options, AlgResponseDTO.class, null).blockOptional();
         if (result.isEmpty() || !result.get().isSuccess()) {

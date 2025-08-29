@@ -49,4 +49,9 @@ public class MQConfiguration
      * RabbitMQ Consumer acknowledge mode
      */
     private String acknowledgeMode;
+
+    /**
+     * RabbitMQ queue count
+     */
+    private Integer queueCount;
 }

@@ -4,13 +4,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.util.UUID;
+
 @Data
 @Schema(description = "回调参数")
 public class CallbackDTO {
 
     @Schema(description = "文件的唯一ID")
     @JsonProperty("itemId")
-    private String taskId;
+    private UUID taskId;
 
     @Schema(description = "文件路径")
     private String key;

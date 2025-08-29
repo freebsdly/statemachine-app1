@@ -4,8 +4,10 @@ import com.trina.visiontask.FileProcessingEvent;
 import com.trina.visiontask.FileProcessingState;
 import com.trina.visiontask.TaskConfiguration;
 import com.trina.visiontask.service.MessageProducer;
+import com.trina.visiontask.service.ObjectStorageOptions;
 import com.trina.visiontask.service.TaskDTO;
 import com.trina.visiontask.service.TaskService;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -20,7 +22,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -34,20 +35,25 @@ public class FileProcessingService {
     private final TaskConfiguration taskConfiguration;
     private final TaskService taskService;
     private final WebClient webClient;
+    private final ObjectStorageOptions options;
 
     public FileProcessingService(
             StateMachineManager stateMachineManager,
             MessageProducer messageProducer,
             TaskConfiguration taskConfiguration,
             TaskService taskService,
-            @Qualifier("getCallbackWebClient") WebClient webClient) {
+            @Qualifier("getCallbackWebClient") WebClient webClient,
+            @Qualifier("objectStorageOptions") ObjectStorageOptions options
+    ) {
         this.stateMachineManager = stateMachineManager;
         this.messageProducer = messageProducer;
         this.taskConfiguration = taskConfiguration;
         this.taskService = taskService;
         this.webClient = webClient;
+        this.options = options;
     }
 
+    @Timed(value = "file.process", description = "file process")
     public void processFile(FileProcessingState initState, FileProcessingEvent event, TaskDTO taskInfo)
             throws Exception {
         if (taskInfo.getTaskId() == null) {
@@ -87,8 +93,13 @@ public class FileProcessingService {
                     taskInfo.setCurrentState(target);
                     taskInfo.setEvent(event);
                     taskInfo.setEndTime(LocalDateTime.now());
+                    // messageProducer.sendToTaskLogQueue(taskInfo);
+                    // 改成直接写入数据库
+                    taskService.saveOrUpdateTask(taskInfo);
+                } else {
+                    log.error("taskInfo is null");
                 }
-                messageProducer.sendToTaskLogQueue(taskInfo);
+
                 switch (target) {
                     case UPLOADED -> messageProducer.sendToPdfConvertQueue(taskInfo);
                     case PDF_CONVERTED -> messageProducer.sendToMdConvertQueue(taskInfo);
@@ -102,10 +113,10 @@ public class FileProcessingService {
                         || target == FileProcessingState.FAILED
                 ) {
                     completionLatch.countDown();
-                } else if (target == FileProcessingState.MARKDOWN_CONVERT_SUBMITTED
-                        || target == FileProcessingState.AI_SLICE_SUBMITTED
-                ) {
-                    log.debug("waiting for markdown or slice callback");
+                } else if (target == FileProcessingState.MARKDOWN_CONVERT_SUBMITTED) {
+                    log.debug("waiting for markdown callback");
+                } else if (target == FileProcessingState.AI_SLICE_SUBMITTED) {
+                    log.debug("waiting for slice callback");
                 }
             }
         };
@@ -129,15 +140,20 @@ public class FileProcessingService {
         stateMachine.stopReactively().subscribe();
     }
 
+
     public void processCallback(CallbackInfo dto) throws Exception {
-        String machineId = dto.getTaskId();
+        String machineId = dto.getTaskId().toString();
         var stateMachine = stateMachineManager.getStateMachine(machineId);
-        TaskDTO task = taskService.getTask(UUID.fromString(dto.getTaskId()));
+        TaskDTO task = taskService.getTask(dto.getTaskId());
         if (stateMachine.isEmpty()) {
             // 状态机不在本地，转发到实际节点
-            String mdCallbackUrl = task.getMdCallbackUrl();
+            String mdCallbackUrl = switch (dto.getStatus()) {
+                case 1, 2 -> task.getMdCallbackUrl();
+                case 3, 4 -> task.getSliceCallbackUrl();
+                default -> null;
+            };
             if (mdCallbackUrl == null || mdCallbackUrl.isEmpty()) {
-                throw new Exception("md callback url not found");
+                throw new Exception("callback url not found");
             }
             log.info("translation request to real node, call {}", mdCallbackUrl);
             webClient.post()
@@ -148,14 +164,23 @@ public class FileProcessingService {
                     .subscribe();
             return;
         }
+        var fileInfo = task.getFileInfo();
         var event = switch (dto.getStatus()) {
-            case 1 -> FileProcessingEvent.MD_CONVERT_SUCCESS;
-            case 2 -> FileProcessingEvent.MD_CONVERT_FAILURE;
+            case 1 -> {
+                fileInfo.setMdPath(String.format("%s/%s", options.getEndpoint(), dto.getKey()));
+                fileInfo.setOssMDKey(dto.getKey());
+                yield FileProcessingEvent.MD_CONVERT_SUCCESS;
+            }
+            case 2 -> {
+                fileInfo.setMdPath(String.format("%s/%s", options.getEndpoint(), dto.getKey()));
+                fileInfo.setOssMDKey(dto.getKey());
+                yield FileProcessingEvent.MD_CONVERT_FAILURE;
+            }
             case 3 -> FileProcessingEvent.AI_SLICE_SUCCESS;
             case 4 -> FileProcessingEvent.AI_SLICE_FAILURE;
             default -> throw new Exception(String.format("callback status %d unsupported", dto.getStatus()));
         };
-
+        task.setFileInfo(fileInfo);
         var message = MessageBuilder.withPayload(event)
                 .setHeader(taskConfiguration.getTaskInfoKey(), task)
                 .build();

@@ -7,6 +7,7 @@ import com.trina.visiontask.repository.FileRepository;
 import com.trina.visiontask.repository.TaskRepository;
 import com.trina.visiontask.repository.entity.FileEntity;
 import com.trina.visiontask.repository.entity.TaskEntity;
+import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,17 +26,21 @@ public class TaskService {
     private final DtoMapper dtoMapper;
     private final ObjectStorageService objectStorageService;
     private final MessageProducer messageProducer;
+    private final EntityManager entityManager;
 
     public TaskService(FileRepository fileRepository,
                        TaskRepository taskRepository,
                        DtoMapper dtoMapper,
                        ObjectStorageService objectStorageService,
-                       MessageProducer messageProducer) {
+                       MessageProducer messageProducer,
+                       EntityManager entityManager
+    ) {
         this.fileRepository = fileRepository;
         this.taskRepository = taskRepository;
         this.dtoMapper = dtoMapper;
         this.objectStorageService = objectStorageService;
         this.messageProducer = messageProducer;
+        this.entityManager = entityManager;
     }
 
 
@@ -62,11 +67,11 @@ public class TaskService {
         if (file.isPresent()) {
             fileEntity = file.get();
             fileEntity = dtoMapper.partialUpdate(taskInfo.getFileInfo(), fileEntity);
-            fileEntity = fileRepository.save(fileEntity);
         } else {
             fileEntity = dtoMapper.toEntity(taskInfo.getFileInfo());
         }
-        fileEntity = fileRepository.save(fileEntity);
+        fileEntity = entityManager.merge(fileEntity);
+        entityManager.flush();
         Optional<TaskEntity> task = taskRepository.findByTaskId(taskInfo.getTaskId());
         TaskEntity taskEntity;
         if (task.isPresent()) {
@@ -76,7 +81,7 @@ public class TaskService {
             taskEntity = dtoMapper.toEntity(taskInfo);
         }
         taskEntity.setFileInfo(fileEntity);
-        taskRepository.save(taskEntity);
+        taskRepository.saveAndFlush(taskEntity);
     }
 
     @Transactional
@@ -88,7 +93,9 @@ public class TaskService {
     }
 
     public TaskDTO getTask(UUID taskId) throws Exception {
-        TaskEntity task = taskRepository.findByTaskId(taskId).orElseThrow();
+        TaskEntity task = taskRepository.findByTaskId(taskId).orElseThrow(
+                () -> new Exception(String.format("task %s not found", taskId))
+        );
         return dtoMapper.toDto(task);
     }
 

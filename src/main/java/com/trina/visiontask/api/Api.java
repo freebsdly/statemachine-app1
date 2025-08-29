@@ -5,7 +5,9 @@ import com.trina.visiontask.converter.DocumentConverter;
 import com.trina.visiontask.service.ObjectStorageService;
 import com.trina.visiontask.service.TaskDTO;
 import com.trina.visiontask.service.TaskService;
+import com.trina.visiontask.statemachine.CallbackInfo;
 import com.trina.visiontask.statemachine.FileProcessingService;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -27,8 +29,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
-public class Api implements ApiDoc
-{
+public class Api implements ApiDoc {
     private static final Logger log = LoggerFactory.getLogger(Api.class);
     private final FileProcessingService fileProcessingService;
     private final ObjectStorageService objectStorageService;
@@ -41,8 +42,7 @@ public class Api implements ApiDoc
             ObjectStorageService objectStorageService,
             @Qualifier("PDFDocumentConverter") DocumentConverter pdfDocumentConverter,
             TaskService taskService,
-            ApiMapper apiMapper)
-    {
+            ApiMapper apiMapper) {
         this.fileProcessingService = fileProcessingService;
         this.objectStorageService = objectStorageService;
         this.pdfDocumentConverter = pdfDocumentConverter;
@@ -50,11 +50,16 @@ public class Api implements ApiDoc
         this.apiMapper = apiMapper;
     }
 
+    @Timed(
+            value = "api.uploadFile",
+            description = "upload file",
+            percentiles = {0.5, 0.95},
+            histogram = true
+    )
     @Override
     @PostMapping(value = "/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiBody<TaskDTO> uploadFile(@RequestParam("file") MultipartFile file,
-                                       @RequestParam(value = "force") boolean force) throws Exception
-    {
+                                       @RequestParam(value = "force") boolean force) throws Exception {
         TaskDTO taskInfo = taskService.uploadFile(file, force);
         return ApiBody.success(taskInfo);
 
@@ -62,8 +67,7 @@ public class Api implements ApiDoc
 
     @GetMapping("/files/download/{id}")
     @Override
-    public ResponseEntity<InputStreamResource> downloadFile(@PathVariable("id") String file) throws Exception
-    {
+    public ResponseEntity<InputStreamResource> downloadFile(@PathVariable("id") String file) throws Exception {
         Optional<OSSObject> download = objectStorageService.download(file).blockOptional();
         if (download.isEmpty()) {
             throw new Exception("file not found");
@@ -89,8 +93,7 @@ public class Api implements ApiDoc
 
     @PostMapping(value = "/files/converts/pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Override
-    public ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception
-    {
+    public ApiBody<String> convertFileToPdf(MultipartFile file) throws Exception {
         if (file.isEmpty()) {
             throw new Exception("file is empty");
         }
@@ -101,17 +104,23 @@ public class Api implements ApiDoc
                 file.getSize(),
                 null);
         DataBufferUtils.write(convert, Path.of("E:/1.pdf"),
-                              StandardOpenOption.CREATE,
-                              StandardOpenOption.TRUNCATE_EXISTING,
-                              StandardOpenOption.WRITE).block();
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE).block();
         return ApiBody.success();
     }
 
+    @Timed(
+            value = "api.callback",
+            description = "md convert and ai slice callback",
+            percentiles = {0.5, 0.95},
+            histogram = true
+    )
     @PostMapping(value = "/files/converts/callback")
     @Override
-    public ApiBody<Void> callBack(@RequestBody CallbackDTO dto) throws Exception
-    {
-        fileProcessingService.processCallback(apiMapper.to(dto));
+    public ApiBody<Void> callBack(@RequestBody CallbackDTO dto) throws Exception {
+        CallbackInfo callbackInfo = apiMapper.to(dto);
+        fileProcessingService.processCallback(callbackInfo);
         return ApiBody.success();
     }
 }

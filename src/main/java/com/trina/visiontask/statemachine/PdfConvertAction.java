@@ -72,7 +72,7 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         ;
     }
 
-    @Timed("pdf_convert_time")
+    @Timed(value = "pdf.convert", description = "pdf convert")
     public void convertToPdf(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");

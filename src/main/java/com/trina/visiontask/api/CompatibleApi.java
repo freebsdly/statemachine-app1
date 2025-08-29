@@ -1,6 +1,7 @@
 package com.trina.visiontask.api;
 
 import com.trina.visiontask.statemachine.FileProcessingService;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,24 +22,28 @@ public class CompatibleApi implements VisionCompatibleApiDoc {
         this.apiMapper = apiMapper;
     }
 
+    @Timed(value = "api.checkFileStatus", description = "check file status")
     @GetMapping(value = "/checkStatus")
     @Override
     public ApiBody<String> checkFileStatus(String id) throws Exception {
         throw new Exception("not implemented");
     }
 
+    @Timed(value = "api.parseFile", description = "parse file")
     @GetMapping("/fileParse")
     @Override
     public ApiBody<String> parseFile(String id) throws Exception {
         throw new Exception("not implemented");
     }
 
+    @Timed(value = "api.uploadDocument", description = "upload document")
     @PostMapping(value = "/uploadDocument")
     @Override
     public ApiBody<String> uploadDocument(String id) throws Exception {
         throw new Exception("not implemented");
     }
 
+    @Timed(value = "api.saveFileStatus", description = "save file status")
     @PostMapping(value = "/saveFileStatus")
     @Override
     public ApiBody<String> saveFileStatus(CallbackDTO dto) throws Exception {

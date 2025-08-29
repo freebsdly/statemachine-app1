@@ -6,6 +6,7 @@ import com.trina.visiontask.FileProcessingState;
 import com.trina.visiontask.TaskConfiguration;
 import com.trina.visiontask.service.MessageProducer;
 import com.trina.visiontask.service.TaskDTO;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.statemachine.StateContext;
@@ -26,6 +27,7 @@ public class FailureAction implements Action<FileProcessingState, FileProcessing
         this.taskConfiguration = taskConfiguration;
     }
 
+    @Timed(value = "failure.retry", description = "failure action")
     @Override
     public void execute(StateContext<FileProcessingState, FileProcessingEvent> context) {
         TaskDTO taskInfo = (TaskDTO) context.getMessage().getHeaders().get(taskConfiguration.getTaskInfoKey());

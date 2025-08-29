@@ -2,6 +2,7 @@ package com.trina.visiontask.statemachine;
 
 import com.trina.visiontask.FileProcessingEvent;
 import com.trina.visiontask.FileProcessingState;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.statemachine.StateMachine;
@@ -45,6 +46,7 @@ public class StateMachineManager {
      * @return
      * @throws Exception
      */
+    @Timed(value = "state.machine.create", description = "create state machine")
     public StateMachine<FileProcessingState, FileProcessingEvent> acquireStateMachine(
             FileProcessingState initState, String machineId
     ) throws Exception {
@@ -70,7 +72,7 @@ public class StateMachineManager {
             stateMachine = machines.get(machineId);
         }
 
-        return Optional.of(stateMachine);
+        return Optional.ofNullable(stateMachine);
     }
 
     /**
@@ -78,6 +80,7 @@ public class StateMachineManager {
      *
      * @param machineId
      */
+    @Timed(value = "state.machine.release", description = "release state machine")
     public void releaseStateMachine(String machineId) {
         synchronized (machines) {
             machines.remove(machineId);

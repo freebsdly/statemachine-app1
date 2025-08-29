@@ -50,7 +50,22 @@ public class MessageProducer {
     }
 
     public void sendToTaskLogQueue(TaskDTO info) throws AmqpException {
-        sendMessage(taskLogConfig, info);
+        // 计算taskId的哈希值并确定分片
+        int shardIndex = getShardIndex(info.getTaskId().toString());
+
+        // 构造分片队列的路由键
+        String routingKey = taskLogConfig.getRoutingKey() + "." + shardIndex;
+        // 发送消息到指定分片
+        rabbitTemplate.convertAndSend(
+                taskLogConfig.getExchangeName(),
+                routingKey,
+                info,
+                message -> {
+                    // 设置优先级属性
+                    message.getMessageProperties().setPriority(info.getPriority());
+                    return message;
+                }
+        );
     }
 
     private void sendMessage(MQConfiguration config, TaskDTO info) throws AmqpException {
@@ -59,5 +74,13 @@ public class MessageProducer {
             message.getMessageProperties().setPriority(info.getPriority());
             return message;
         });
+    }
+
+    /**
+     * 根据taskId计算分片索引
+     * 使用一致性哈希确保相同taskId总是路由到同一分片
+     */
+    private int getShardIndex(String taskId) {
+        return Math.abs(taskId.hashCode()) % taskLogConfig.getQueueCount();
     }
 }

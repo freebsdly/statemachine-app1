@@ -67,7 +67,7 @@ public class MdConvertSubmitAction implements Action<FileProcessingState, FilePr
         }).orTimeout(taskConfiguration.getMdConvertTaskTimeout(), TimeUnit.SECONDS);
     }
 
-    @Timed("md_convert_submit_time")
+    @Timed(value = "md.convert.submit", description = "md convert submit")
     private void submitMarkdownConvertRequest(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
@@ -78,7 +78,7 @@ public class MdConvertSubmitAction implements Action<FileProcessingState, FilePr
         log.info("submitting md {} convert request", fileInfo.getFileName());
         // 这里设置为taskId，以便回调时查找状态机
         AlgRequestDTO options = new AlgRequestDTO(taskInfo.getTaskId().toString(), fileInfo.getOssPDFKey(),
-                null, converterOptions.getEnvId());
+                null, converterOptions.getEnvId(), null);
         Optional<AlgResponseDTO> result = markdownDocumentConverter.convert(
                 options, AlgResponseDTO.class, null).blockOptional();
         if (result.isEmpty() || !result.get().isSuccess()) {
