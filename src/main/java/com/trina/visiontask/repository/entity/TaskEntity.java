@@ -27,6 +27,7 @@ public class TaskEntity {
     private int priority;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
+    @Column(length = 2000)
     private String message;
     private FileProcessingState previousState;
     private FileProcessingState currentState;
@@ -37,4 +38,5 @@ public class TaskEntity {
 
     private String mdCallbackUrl;
     private String sliceCallbackUrl;
+    private String operator;
 }

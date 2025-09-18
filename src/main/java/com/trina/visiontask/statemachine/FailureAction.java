@@ -57,8 +57,10 @@ public class FailureAction implements Action<FileProcessingState, FileProcessing
     }
 
     public int calculatePriority(int currentPriority) {
-        // 使用指数提升: 2^(currentPriority/3)，但不超过最大值10
-        int newPriority = (int) Math.round(Math.pow(2, currentPriority / 3.0));
-        return Math.min(newPriority, 10);
+        // 使用偏移量确保从0开始也能递增
+        double exponent = (currentPriority + 1) / 3.0;
+        int newPriority = (int) Math.round(Math.pow(2, exponent));
+        // 确保结果至少比输入值大（除非达到上限）
+        return Math.min(Math.max(newPriority, currentPriority + 1), 10);
     }
 }

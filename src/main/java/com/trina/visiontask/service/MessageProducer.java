@@ -1,35 +1,45 @@
 package com.trina.visiontask.service;
 
 import com.trina.visiontask.MQConfiguration;
+import com.trina.visiontask.TaskConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
 public class MessageProducer {
     private static final Logger log = LoggerFactory.getLogger(MessageProducer.class);
+    private final KafkaTemplate<String, TaskDTO> kafkaTemplate;
     private final RabbitTemplate rabbitTemplate;
     private final MQConfiguration uploadConfig;
     private final MQConfiguration pdfConvertConfig;
     private final MQConfiguration mdConvertConfig;
     private final MQConfiguration aiSliceConfig;
     private final MQConfiguration taskLogConfig;
+    private final TaskConfiguration taskConfiguration;
 
-    public MessageProducer(RabbitTemplate rabbitTemplate,
-                           @Qualifier("uploadConfiguration") MQConfiguration uploadConfig,
-                           @Qualifier("pdfConvertConfiguration") MQConfiguration pdfConvertConfig,
-                           @Qualifier("mdConvertConfiguration") MQConfiguration mdConvertConfig,
-                           @Qualifier("aiSliceConfiguration") MQConfiguration aiSliceConfig,
-                           @Qualifier("taskLogConfiguration") MQConfiguration taskLogConfig) {
+    public MessageProducer(
+            KafkaTemplate<String, TaskDTO> kafkaTemplate,
+            RabbitTemplate rabbitTemplate,
+            @Qualifier("uploadConfiguration") MQConfiguration uploadConfig,
+            @Qualifier("pdfConvertConfiguration") MQConfiguration pdfConvertConfig,
+            @Qualifier("mdConvertConfiguration") MQConfiguration mdConvertConfig,
+            @Qualifier("aiSliceConfiguration") MQConfiguration aiSliceConfig,
+            @Qualifier("taskLogConfiguration") MQConfiguration taskLogConfig,
+            TaskConfiguration taskConfiguration
+    ) {
+        this.kafkaTemplate = kafkaTemplate;
         this.rabbitTemplate = rabbitTemplate;
         this.uploadConfig = uploadConfig;
         this.pdfConvertConfig = pdfConvertConfig;
         this.mdConvertConfig = mdConvertConfig;
         this.aiSliceConfig = aiSliceConfig;
         this.taskLogConfig = taskLogConfig;
+        this.taskConfiguration = taskConfiguration;
     }
 
 
@@ -50,22 +60,7 @@ public class MessageProducer {
     }
 
     public void sendToTaskLogQueue(TaskDTO info) throws AmqpException {
-        // 计算taskId的哈希值并确定分片
-        int shardIndex = getShardIndex(info.getTaskId().toString());
-
-        // 构造分片队列的路由键
-        String routingKey = taskLogConfig.getRoutingKey() + "." + shardIndex;
-        // 发送消息到指定分片
-        rabbitTemplate.convertAndSend(
-                taskLogConfig.getExchangeName(),
-                routingKey,
-                info,
-                message -> {
-                    // 设置优先级属性
-                    message.getMessageProperties().setPriority(info.getPriority());
-                    return message;
-                }
-        );
+        sendMessage(taskLogConfig, info);
     }
 
     private void sendMessage(MQConfiguration config, TaskDTO info) throws AmqpException {
@@ -74,6 +69,10 @@ public class MessageProducer {
             message.getMessageProperties().setPriority(info.getPriority());
             return message;
         });
+    }
+
+    public void sendToTaskLogKafka(TaskDTO info) {
+        kafkaTemplate.send(taskConfiguration.getKafkaTopic(), info.getTaskId().toString(), info);
     }
 
     /**

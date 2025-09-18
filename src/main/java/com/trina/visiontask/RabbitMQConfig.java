@@ -11,8 +11,6 @@ import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainer
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 @Configuration
@@ -45,26 +43,8 @@ public class RabbitMQConfig {
 
     @Bean
     public Declarables taskLogQueueConfig(@Qualifier("taskLogConfiguration") MQConfiguration mqConfig) {
-        List<Declarable> declarableList = new ArrayList<>();
-
-        // 创建多个分片队列
-        for (int i = 0; i < mqConfig.getQueueCount(); i++) {
-            String queueName = mqConfig.getQueueName() + "_" + i;
-            Queue queue = QueueBuilder.durable(queueName).build();
-            TopicExchange exchange = ExchangeBuilder.topicExchange(mqConfig.getExchangeName())
-                    .durable(true)
-                    .build();
-            Binding binding = BindingBuilder.bind(queue)
-                    .to(exchange)
-                    .with(mqConfig.getRoutingKey() + "." + i);
-
-            // 添加到列表中
-            declarableList.add(queue);
-            declarableList.add(exchange);
-            declarableList.add(binding);
-        }
-
-        return new Declarables(declarableList);
+        Map<String, Object> args = Map.of();
+        return getDeclarables(mqConfig, args);
     }
 
     private Declarables getDeclarables(MQConfiguration mqConfig, Map<String, Object> args) {

@@ -9,7 +9,6 @@ import com.trina.visiontask.converter.DocumentConverter;
 import com.trina.visiontask.service.FileDTO;
 import com.trina.visiontask.service.ObjectStorageService;
 import com.trina.visiontask.service.TaskDTO;
-import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -24,7 +23,6 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -69,10 +67,8 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
             }
             context.getStateMachine().sendEvent(Mono.just(message)).subscribe();
         }).orTimeout(taskConfiguration.getPdfConvertTaskTimeout(), TimeUnit.SECONDS);
-        ;
     }
 
-    @Timed(value = "pdf.convert", description = "pdf convert")
     public void convertToPdf(TaskDTO taskInfo) throws Exception {
         if (taskInfo == null || taskInfo.getFileInfo() == null) {
             log.error("file info is null");
@@ -80,36 +76,49 @@ public class PdfConvertAction implements Action<FileProcessingState, FileProcess
         }
         taskInfo.setStartTime(LocalDateTime.now());
         FileDTO fileInfo = taskInfo.getFileInfo();
-        log.info("converting pdf: {}", fileInfo.getFileName());
-        Optional<OSSObject> download = objectStorageService.download(fileInfo.getOssFileKey()).blockOptional();
-        if (download.isEmpty()) {
-            throw new Exception("file not found");
-        }
-        OSSObject ossObject = download.get();
-        long contentLength = ossObject.getObjectMetadata().getContentLength();
+        if (taskInfo.checkSupportedFileType()) {
+            log.info("converting pdf: {}", fileInfo.getFileName());
+            Optional<OSSObject> download = objectStorageService.download(fileInfo.getOssFileKey()).blockOptional();
+            if (download.isEmpty()) {
+                throw new Exception("file not found");
+            }
+            OSSObject ossObject = download.get();
+            long contentLength = ossObject.getObjectMetadata().getContentLength();
 
-        String uploadName = String.format("%s.%s", UUID.randomUUID(), "pdf");
-        if (fileInfo.getOssPDFKey() != null && !fileInfo.getOssPDFKey().isEmpty()) {
-            uploadName = fileInfo.getOssPDFKey();
+            String ossFileName = fileInfo.getOssFileKey();
+            String fileNamePrefix;
+            int i = ossFileName.lastIndexOf('.');
+            if (i > 0) {
+                fileNamePrefix = ossFileName.substring(0, i);
+            } else {
+                fileNamePrefix = ossFileName;
+            }
+            String uploadName = String.format("%s.%s", fileNamePrefix, "pdf");
+            Flux<DataBuffer> convert = documentConverter.convert(
+                    ossObject.getObjectContent(),
+                    uploadName,
+                    contentLength,
+                    null);
+            Optional<CompleteMultipartUploadResult> uploadResult = objectStorageService
+                    .uploadFlux(uploadName, convert)
+                    .blockOptional();
+            if (uploadResult.isEmpty()) {
+                log.error("upload pdf {} failed", fileInfo.getFileName());
+                throw new Exception("upload pdf failed");
+            }
+            CompleteMultipartUploadResult result = uploadResult.get();
+            fileInfo.setOssPDFKey(result.getKey());
+            fileInfo.setPdfPath(result.getLocation());
+            taskInfo.setFileInfo(fileInfo);
+            log.info("convert pdf {} finished", fileInfo.getFileName());
+        } else {
+            Thread.sleep(500);
+            log.info("file type is {}, do not need to be converted to pdf", fileInfo.getFileType());
+            fileInfo.setOssPDFKey(fileInfo.getOssFileKey());
+            fileInfo.setPdfPath(fileInfo.getFilePath());
+            taskInfo.setFileInfo(fileInfo);
         }
-        Flux<DataBuffer> convert = documentConverter.convert(
-                ossObject.getObjectContent(),
-                uploadName,
-                contentLength,
-                null);
-        Optional<CompleteMultipartUploadResult> uploadResult = objectStorageService
-                .uploadFlux(uploadName, convert)
-                .blockOptional();
-        if (uploadResult.isEmpty()) {
-            log.error("upload pdf {} failed", fileInfo.getFileName());
-            throw new Exception("upload pdf failed");
-        }
-        CompleteMultipartUploadResult result = uploadResult.get();
-        fileInfo.setOssPDFKey(result.getKey());
-        fileInfo.setPdfPath(result.getLocation());
-        taskInfo.setFileInfo(fileInfo);
         taskInfo.setEndTime(LocalDateTime.now());
-        log.info("convert pdf {} finished", fileInfo.getFileName());
     }
 }
 

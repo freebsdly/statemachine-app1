@@ -34,4 +34,24 @@ public class TaskConfiguration {
      * AI处理任务超时
      */
     private long aiSliceTaskTimeout;
+
+    /**
+     * 上传任务OSS文件前缀
+     */
+    private String uploadOssPrefix;
+
+    /**
+     * PDF转换任务OSS文件前缀
+     */
+    private String pdfConvertOssPrefix;
+
+    /**
+     * 是否记录任务详细的历史日志
+     */
+    private boolean logHistory;
+
+    /**
+     * Kafka topic
+     */
+    private String kafkaTopic;
 }

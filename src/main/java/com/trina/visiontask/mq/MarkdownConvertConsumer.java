@@ -5,6 +5,7 @@ import com.trina.visiontask.FileProcessingEvent;
 import com.trina.visiontask.FileProcessingState;
 import com.trina.visiontask.service.TaskDTO;
 import com.trina.visiontask.statemachine.FileProcessingService;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
@@ -28,6 +29,7 @@ public class MarkdownConvertConsumer {
 
     }
 
+    @Timed(value = "md-convert.process.task-time", description = "md convert process task time")
     @RabbitListener(id = "md-convert.consumer", queues = "${md-convert.consumer.queue-name}")
     public void consumeMessage(Channel channel, TaskDTO taskInfo, Message message) throws Exception {
         log.debug("=======> received md convert message");
@@ -38,7 +40,7 @@ public class MarkdownConvertConsumer {
             log.warn("consume md convert message failed, {}", e.getMessage());
         }
         channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
-        log.debug("<======== finished process md convert message");
+        log.debug("<======== finished process md convert message. {}", taskInfo);
     }
 
     /**

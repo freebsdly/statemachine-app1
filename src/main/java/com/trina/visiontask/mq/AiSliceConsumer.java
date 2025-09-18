@@ -5,6 +5,7 @@ import com.trina.visiontask.service.TaskDTO;
 import com.trina.visiontask.FileProcessingEvent;
 import com.trina.visiontask.statemachine.FileProcessingService;
 import com.trina.visiontask.FileProcessingState;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
@@ -28,6 +29,7 @@ public class AiSliceConsumer {
         this.callbackUrl = callbackUrl;
     }
 
+    @Timed(value = "ai-slice.process.task-time", description = "ai slice process task time")
     @RabbitListener(id = "ai-slice.consumer", queues = "${ai-slice.consumer.queue-name}")
     public void consumeMessage(Channel channel, TaskDTO taskInfo, Message message) throws Exception {
         log.debug("=====> received ai slice message");

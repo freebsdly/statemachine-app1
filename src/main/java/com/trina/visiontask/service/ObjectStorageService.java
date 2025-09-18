@@ -2,6 +2,7 @@ package com.trina.visiontask.service;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.model.*;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -22,6 +23,7 @@ import java.util.UUID;
 @Service
 public class ObjectStorageService {
     private static final Logger log = LoggerFactory.getLogger(ObjectStorageService.class);
+    @Getter
     private final ObjectStorageOptions options;
     private final OSS ossClient;
     private final DataBufferFactory dataBufferFactory;
@@ -258,5 +260,102 @@ public class ObjectStorageService {
         return uploadFlux(ossFileName, dataBufferFlux);
     }
 
+    public Mono<List<OSSObjectSummary>> listObjects(String prefix, Integer maxKeys) {
+        return Mono.fromCallable(() -> {
+            ListObjectsRequest request = new ListObjectsRequest();
+            request.setBucketName(options.getBucketName());
+            if (prefix != null && !prefix.isEmpty()) {
+                if (!prefix.endsWith("/")) {
+                    request.setPrefix(prefix + "/");
+                }
+                request.setPrefix(prefix);
+            }
 
+            if (maxKeys != null && maxKeys > 0) {
+                request.setMaxKeys(maxKeys);
+            }
+
+            ObjectListing objectListing = ossClient.listObjects(request);
+            return objectListing.getObjectSummaries();
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+
+    /**
+     * 分页列出存储桶中的对象
+     *
+     * @param prefix  对象名称前缀过滤器
+     * @param maxKeys 最大返回对象数量
+     * @param marker  分页标记
+     * @return 对象列表结果（包含分页信息）
+     */
+    public Mono<ObjectListing> listObjectsWithMarker(String prefix, Integer maxKeys, String marker) {
+        return Mono.fromCallable(() -> {
+            ListObjectsRequest request = new ListObjectsRequest();
+            request.setBucketName(options.getBucketName());
+
+            if (prefix != null && !prefix.isEmpty()) {
+                request.setPrefix(prefix);
+            }
+
+            if (maxKeys != null && maxKeys > 0) {
+                request.setMaxKeys(maxKeys);
+            }
+
+            if (marker != null && !marker.isEmpty()) {
+                request.setMarker(marker);
+            }
+
+            return ossClient.listObjects(request);
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * 批量创建多级目录
+     *
+     * @param directoryPath 完整目录路径
+     * @return 创建结果列表
+     */
+    public Mono<List<PutObjectResult>> createDirectories(String directoryPath) {
+        return Mono.fromCallable(() -> {
+            List<PutObjectResult> results = new java.util.ArrayList<>();
+
+            // 确保路径以 "/" 结尾
+            String fullPath = directoryPath;
+            if (!fullPath.endsWith("/")) {
+                fullPath = fullPath + "/";
+            }
+
+            // 分割路径并逐级创建目录
+            String[] parts = fullPath.split("/");
+            StringBuilder currentPath = new StringBuilder();
+
+            for (String part : parts) {
+                if (!part.isEmpty()) {
+                    currentPath.append(part).append("/");
+
+                    // 创建当前层级目录
+                    PutObjectRequest request = new PutObjectRequest(
+                            options.getBucketName(),
+                            currentPath.toString(),
+                            new ByteArrayInputStream(new byte[0]),
+                            new ObjectMetadata()
+                    );
+
+                    ObjectMetadata metadata = new ObjectMetadata();
+                    metadata.setContentLength(0);
+                    request.setMetadata(metadata);
+
+                    PutObjectResult result = ossClient.putObject(request);
+                    results.add(result);
+                }
+            }
+
+            return results;
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    public void listDirectoryObjects(String prefix) throws Exception {
+
+    }
 }

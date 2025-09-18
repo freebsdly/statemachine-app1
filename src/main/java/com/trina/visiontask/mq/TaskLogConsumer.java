@@ -26,14 +26,15 @@ public class TaskLogConsumer {
         this.mqConfig = mqConfig;
     }
 
-    // TODO: 多consumer协商或指定一个队列
     @RabbitListener(id = "task-log.consumer", queues = {"${task-log.consumer.queue-name}"}, containerFactory = "taskLogContainerFactory")
     public void consumeMessage(TaskDTO taskInfo) throws Exception {
         log.debug("received task log message: {}", taskInfo);
         try {
-            taskService.saveOrUpdateTask(taskInfo);
+            // 这里只更新ossFile的信息
+            taskService.updateOssFile(taskInfo);
+            taskService.saveTaskHistory(taskInfo);
         } catch (Exception e) {
-            log.error("save task log failed", e);
+            log.error("save task history log failed", e);
         }
     }
 }

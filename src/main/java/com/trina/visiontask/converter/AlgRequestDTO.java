@@ -1,16 +1,13 @@
 package com.trina.visiontask.converter;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import java.util.UUID;
 
-import java.io.Serializable;
 
-@Data
-@AllArgsConstructor
-public class AlgRequestDTO implements Serializable {
-    private String itemId;
-    private String key;
-    private Long timestamp;
-    private String envId;
-    private String tags;
+public record AlgRequestDTO(
+        UUID itemId,
+        String key,
+        Long timestamp,
+        String envId,
+        String tags
+) {
 }

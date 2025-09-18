@@ -10,7 +10,8 @@ import com.trina.visiontask.converter.DocumentConverter;
 import com.trina.visiontask.service.FileDTO;
 import com.trina.visiontask.service.TaskDTO;
 import io.micrometer.core.annotation.Timed;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
@@ -24,10 +25,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Component
 public class AiSliceSubmitAction implements Action<FileProcessingState, FileProcessingEvent> {
-
+    private static final Logger log = LoggerFactory.getLogger(AiSliceSubmitAction.class);
     private final DocumentConverter aiSliceConverter;
     private final ConverterOptions converterOptions;
     private final TaskConfiguration taskConfiguration;
@@ -64,7 +64,6 @@ public class AiSliceSubmitAction implements Action<FileProcessingState, FileProc
             }
             context.getStateMachine().sendEvent(Mono.just(message)).subscribe();
         }).orTimeout(taskConfiguration.getAiSliceTaskTimeout(), TimeUnit.SECONDS);
-        ;
     }
 
     @Timed(value = "ai.slice.submit", description = "ai slice submit")
@@ -75,16 +74,21 @@ public class AiSliceSubmitAction implements Action<FileProcessingState, FileProc
         }
         taskInfo.setStartTime(LocalDateTime.now());
         FileDTO fileInfo = taskInfo.getFileInfo();
-        log.info("submitting ai slice request, {}", fileInfo.getFileName());
-        AlgRequestDTO options = new AlgRequestDTO(fileInfo.getFileId().toString(), fileInfo.getOssMDKey(),
-                System.currentTimeMillis(), converterOptions.getEnvId(), null);
-        Optional<AlgResponseDTO> result = aiSliceConverter.convert(
-                options, AlgResponseDTO.class, null).blockOptional();
-        if (result.isEmpty() || !result.get().isSuccess()) {
-            throw new Exception("submit ai slice request failed");
+        if (taskInfo.checkSupportedFileType()) {
+            log.info("submitting ai slice request, {}", fileInfo.getFileName());
+            AlgRequestDTO options = new AlgRequestDTO(taskInfo.getTaskId(), fileInfo.getOssMDKey(),
+                    System.currentTimeMillis(), converterOptions.getEnvId(), null);
+            Optional<AlgResponseDTO> result = aiSliceConverter.convert(
+                    options, AlgResponseDTO.class, null).blockOptional();
+            if (result.isEmpty() || !result.get().success()) {
+                throw new Exception("submit ai slice request failed");
+            }
+            log.info("{} ai slice request submitted", fileInfo.getFileName());
+        } else {
+            log.info("file type is {}, do not need to be sliced", fileInfo.getFileType());
         }
+
         taskInfo.setEndTime(LocalDateTime.now());
-        log.info("{} ai slice request submitted", fileInfo.getFileName());
     }
 }
 

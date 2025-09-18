@@ -8,7 +8,7 @@ public class ObjectStorageOptions {
     private String accessKey;
     private String accessSecret;
     private String bucketName;
-    private String document;
+    private String prefix;
     private int partSize;
     private int downloadBufferSize;
 }

@@ -57,7 +57,14 @@ public class PDFDocumentConverter implements DocumentConverter {
                 .uri(converterOptions.getUrl())
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(BodyInserters.fromMultipartData("files", resource))
-                .exchangeToFlux(response -> response.bodyToFlux(DataBuffer.class));
+                .exchangeToFlux(response -> {
+                    if (response.statusCode().is2xxSuccessful()) {
+                        return response.bodyToFlux(DataBuffer.class);
+                    } else {
+                        ConversionException ex = new ConversionException(String.format("Conversion failed. %s", response.statusCode()));
+                        return Flux.error(ex);
+                    }
+                });
 
     }
 }

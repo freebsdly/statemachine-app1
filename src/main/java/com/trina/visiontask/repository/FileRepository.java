@@ -10,7 +10,10 @@ import java.util.UUID;
 
 @Repository
 public interface FileRepository extends JpaRepository<FileEntity, Long>, QuerydslPredicateExecutor<FileEntity> {
+
     Optional<FileEntity> findByFileId(UUID id);
 
-    Optional<FileEntity> findByFileName(String fileName);
+    Optional<FileEntity> findByPdfFileId(UUID pdfFileId);
+
+    Optional<FileEntity> findByOssFileKey(String ossFileKey);
 }

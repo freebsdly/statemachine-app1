@@ -1,5 +1,6 @@
 package com.trina.visiontask.service;
 
+import com.trina.visiontask.FileProcessingState;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -26,4 +27,8 @@ public class FileDTO implements Serializable {
     private LocalDateTime createTime;
     private LocalDateTime modifyTime;
     private Long fileSize;
+    private FileProcessingState status;
+    private String parentPath;
+    private String tankId;
+    private UUID pdfFileId;
 }

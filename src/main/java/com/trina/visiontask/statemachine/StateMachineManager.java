@@ -2,7 +2,6 @@ package com.trina.visiontask.statemachine;
 
 import com.trina.visiontask.FileProcessingEvent;
 import com.trina.visiontask.FileProcessingState;
-import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.statemachine.StateMachine;
@@ -37,16 +36,6 @@ public class StateMachineManager {
         this.aiSliceSubmitAction = aiSliceSubmitAction;
     }
 
-
-    /**
-     * 获取一个状态机, 需要用户侧启动状态机
-     *
-     * @param initState
-     * @param machineId
-     * @return
-     * @throws Exception
-     */
-    @Timed(value = "state.machine.create", description = "create state machine")
     public StateMachine<FileProcessingState, FileProcessingEvent> acquireStateMachine(
             FileProcessingState initState, String machineId
     ) throws Exception {
@@ -75,12 +64,6 @@ public class StateMachineManager {
         return Optional.ofNullable(stateMachine);
     }
 
-    /**
-     * 释放一个状态机，需要用户侧关闭状态机
-     *
-     * @param machineId
-     */
-    @Timed(value = "state.machine.release", description = "release state machine")
     public void releaseStateMachine(String machineId) {
         synchronized (machines) {
             machines.remove(machineId);

@@ -27,4 +27,39 @@ public class TaskDTO implements Serializable {
     private FileDTO fileInfo;
     private String mdCallbackUrl;
     private String sliceCallbackUrl;
+    private String operator;
+
+    // 检查源文件类型
+    // TODO: 去除硬编码
+    public boolean checkSupportedFileType() {
+        if (fileInfo == null) {
+            return false;
+        }
+        String fileType = fileInfo.getFileType();
+        if (fileType == null) {
+            return false;
+        }
+        String check = fileType.toLowerCase();
+        switch (taskType) {
+            case "upload" -> {
+                return true;
+            }
+            case "pdf-convert" -> {
+                return check.equals("doc")
+                        || check.equals("docx")
+                        || check.equals("ppt")
+                        || check.equals("pptx");
+            }
+            case "md-convert", "ai-slice" -> {
+                return check.equals("pdf")
+                        || check.equals("doc")
+                        || check.equals("docx")
+                        || check.equals("ppt")
+                        || check.equals("pptx");
+            }
+            default -> {
+                return false;
+            }
+        }
+    }
 }

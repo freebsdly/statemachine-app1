@@ -1,10 +1,10 @@
 package com.trina.visiontask.mq;
 
 import com.rabbitmq.client.Channel;
-import com.trina.visiontask.service.TaskDTO;
 import com.trina.visiontask.FileProcessingEvent;
-import com.trina.visiontask.statemachine.FileProcessingService;
 import com.trina.visiontask.FileProcessingState;
+import com.trina.visiontask.service.TaskDTO;
+import com.trina.visiontask.statemachine.FileProcessingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
@@ -33,7 +33,7 @@ public class FileUploadConsumer {
             log.warn("consume upload message failed, {}", e.getMessage());
         }
         channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
-        log.debug("<========= Finished processing upload message");
+        log.debug("<========= Finished processing upload message. {}", taskInfo);
     }
 
     /**

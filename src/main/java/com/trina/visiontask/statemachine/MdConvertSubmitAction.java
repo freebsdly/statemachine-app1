@@ -6,7 +6,7 @@ import com.trina.visiontask.TaskConfiguration;
 import com.trina.visiontask.converter.AlgRequestDTO;
 import com.trina.visiontask.converter.AlgResponseDTO;
 import com.trina.visiontask.converter.ConverterOptions;
-import com.trina.visiontask.converter.MarkdownDocumentConverter;
+import com.trina.visiontask.converter.DocumentConverter;
 import com.trina.visiontask.service.FileDTO;
 import com.trina.visiontask.service.TaskDTO;
 import io.micrometer.core.annotation.Timed;
@@ -28,12 +28,12 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class MdConvertSubmitAction implements Action<FileProcessingState, FileProcessingEvent> {
     private static final Logger log = LoggerFactory.getLogger(MdConvertSubmitAction.class);
-    private final MarkdownDocumentConverter markdownDocumentConverter;
+    private final DocumentConverter markdownDocumentConverter;
     private final ConverterOptions converterOptions;
     private final TaskConfiguration taskConfiguration;
 
     public MdConvertSubmitAction(
-            @Qualifier("mdConverter") MarkdownDocumentConverter markdownDocumentConverter,
+            @Qualifier("mdConverter") DocumentConverter markdownDocumentConverter,
             @Qualifier("mdConverterOptions") ConverterOptions converterOptions,
             TaskConfiguration taskConfiguration
     ) {
@@ -75,16 +75,20 @@ public class MdConvertSubmitAction implements Action<FileProcessingState, FilePr
         }
         taskInfo.setStartTime(LocalDateTime.now());
         FileDTO fileInfo = taskInfo.getFileInfo();
-        log.info("submitting md {} convert request", fileInfo.getFileName());
-        // 这里设置为taskId，以便回调时查找状态机
-        AlgRequestDTO options = new AlgRequestDTO(taskInfo.getTaskId().toString(), fileInfo.getOssPDFKey(),
-                null, converterOptions.getEnvId(), null);
-        Optional<AlgResponseDTO> result = markdownDocumentConverter.convert(
-                options, AlgResponseDTO.class, null).blockOptional();
-        if (result.isEmpty() || !result.get().isSuccess()) {
-            throw new Exception("submit md convert request failed");
+        if (taskInfo.checkSupportedFileType()) {
+            log.info("submitting md {} convert request", fileInfo.getFileName());
+            // 这里设置为taskId，以便回调时查找状态机
+            AlgRequestDTO options = new AlgRequestDTO(taskInfo.getTaskId(), fileInfo.getOssPDFKey(),
+                    null, converterOptions.getEnvId(), null);
+            Optional<AlgResponseDTO> result = markdownDocumentConverter.convert(
+                    options, AlgResponseDTO.class, null).blockOptional();
+            if (result.isEmpty() || !result.get().success()) {
+                throw new Exception("submit md convert request failed");
+            }
+            log.info(" {} md convert request submitted", fileInfo.getFileName());
+        } else {
+            log.info("file type is {}, do not need to be converted to md", fileInfo.getFileType());
         }
         taskInfo.setEndTime(LocalDateTime.now());
-        log.info(" {} md convert request submitted", fileInfo.getFileName());
     }
 }
